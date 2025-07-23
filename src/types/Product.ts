@@ -15,7 +15,7 @@ export interface Product {
   image?: string;            // Imagen principal
   type?: string;             // Tipo (ej: "Conector", "Cable", etc.)
   datasheet?: string;        // Ficha técnica
-  compatibles?: ProductCompatible[];  // Array de objetos compatible
+ compatibles?: string[]; // 👈 no ProductCompatible[]
   price?: number;
   stock?: number;
 }

@@ -74,7 +74,7 @@ const filteredProducts = useMemo(() => {
       setLoadingCompatibles(true);
 
       // OBTÉN LOS CÓDIGOS DE LOS COMPATIBLES
-      const compatiblesCodes = product.compatibles.map((c) => c.code);
+    const compatiblesCodes = product.compatibles; // ya es string[]
 
       // FILTRA LOS PRODUCTOS QUE COINCIDEN CON ALGÚN CÓDIGO
       const compatiblesList = products.filter((p) =>
