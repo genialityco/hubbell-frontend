@@ -3,7 +3,7 @@ import axios from "axios";
 import type { Product } from "../types/Product";
 
 //const API_URL = "https://hubbell-backend.vercel.app/api/products";
-const API_URL  = "https://hubbell-backend-vmetx.ondigitalocean.app/";
+const API_URL  = "https://hubbell-backend-vmetx.ondigitalocean.app/api/products";
 
 interface ProductsResponse {
   products: Product[];
