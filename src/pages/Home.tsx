@@ -304,14 +304,14 @@ export default function Home() {
                           />
                         </Card.Section>
                         <Stack align="center" gap={0} mt="md">
-                          {/* <Text size="md" fw={500}>
-                            {comp.group || "Sin categoría"}
-                          </Text> */}
                           <Text size="lg" fw={600}>
                             {comp.name}
                           </Text>
                           <Text size="sm" c="dimmed">
                             {comp.code}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {comp.type || "Sin tipo"}
                           </Text>
                         </Stack>
                         <Button size="xs" bg="black" bdrs="lg" my="sm">
