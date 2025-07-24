@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Checkbox,
@@ -21,6 +21,7 @@ import ProductSearchHero from "../components/ProductSearchHero";
 import { fetchProducts } from "../services/productService";
 
 export default function Home() {
+  const selectedProductRef = useRef<HTMLDivElement>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
@@ -39,52 +40,63 @@ export default function Home() {
       const types = Array.from(
         new Set(data.products.map((prod: Product) => prod.type || "Sin tipo"))
       );
-      console.log(types);
       setCategoryOptions(types);
       setSelectedCategories(types); // Todos seleccionados por defecto
     });
   }, []);
 
   // Filtra productos según checklist y búsqueda
-const filteredProducts = useMemo(() => {
-  // Si no hay categorías seleccionadas, no mostramos nada
-  if (selectedCategories.length === 0) return [];
+  const filteredProducts = useMemo(() => {
+    // Si no hay categorías seleccionadas, no mostramos nada
+    if (selectedCategories.length === 0) return [];
 
-  return products.filter((prod) => {
-    const type = prod.type || "Sin tipo";
-    const matchesCategory = selectedCategories.includes(type);
+    return products.filter((prod) => {
+      const type = prod.type || "Sin tipo";
+      const matchesCategory = selectedCategories.includes(type);
 
-    // Si el producto no tiene type válido, no mostrarlo
-    if (!type || type === "Sin tipo") return false;
+      // Si el producto no tiene type válido, no mostrarlo
+      if (!type || type === "Sin tipo") return false;
 
-    const matchesSearch =
-      prod.name?.toLowerCase().includes(search.toLowerCase()) ||
-      prod.code?.toLowerCase().includes(search.toLowerCase()) ||
-      prod.brand?.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch =
+        prod.name?.toLowerCase().includes(search.toLowerCase()) ||
+        prod.code?.toLowerCase().includes(search.toLowerCase()) ||
+        prod.brand?.toLowerCase().includes(search.toLowerCase());
 
-    return matchesCategory && (!search || matchesSearch);
-  });
-}, [products, selectedCategories, search]);
-
+      return matchesCategory && (!search || matchesSearch);
+    });
+  }, [products, selectedCategories, search]);
 
   // Selecciona producto y filtra compatibles
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
-    if (product.compatibles && product.compatibles.length > 0) {
+
+    // Extrae los códigos de los compatibles (array de objetos)
+    const compatiblesCodes = Array.isArray(product.compatibles)
+      ? product.compatibles.map((c) => c.code)
+      : [];
+
+    if (compatiblesCodes.length > 0) {
       setLoadingCompatibles(true);
 
-      // OBTÉN LOS CÓDIGOS DE LOS COMPATIBLES
-    const compatiblesCodes = product.compatibles; // ya es string[]
-
-      // FILTRA LOS PRODUCTOS QUE COINCIDEN CON ALGÚN CÓDIGO
+      // Normaliza códigos por si acaso
+      const codesSet = new Set(
+        compatiblesCodes.map((c) => c.trim().toLowerCase())
+      );
       const compatiblesList = products.filter((p) =>
-        compatiblesCodes.includes(p.code)
+        codesSet.has(p.code.trim().toLowerCase())
       );
       setCompatibles(compatiblesList);
       setLoadingCompatibles(false);
     } else {
       setCompatibles([]);
     }
+    // Espera un tick para que el render termine y luego hace scroll
+    setTimeout(() => {
+      selectedProductRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
   };
 
   const handleClearSelected = () => {
@@ -164,7 +176,7 @@ const filteredProducts = useMemo(() => {
           <Box flex={1} w="100%" mih={620}>
             {/* Panel superior: Producto buscado */}
             {selectedProduct && (
-              <Box mb="lg">
+              <Box mb="lg" ref={selectedProductRef}>
                 <Text fw={700} size="xl" mb={6}>
                   Producto buscado
                 </Text>
