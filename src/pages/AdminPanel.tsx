@@ -1,6 +1,5 @@
-/* eslint-disable no-dupe-else-if */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/pages/AdminPanel.tsx
+/* eslint-disable no-dupe-else-if */
 import { useState } from "react";
 import {
   TextInput,
@@ -16,6 +15,7 @@ import { createProduct } from "../services/productService";
 import * as XLSX from "xlsx";
 import type { Product } from "../types/Product";
 
+// Estado inicial ajustado: compatibles es array de objetos { code, type }
 const INITIAL: Omit<Product, "_id"> = {
   code: "",
   name: "",
@@ -31,25 +31,28 @@ const INITIAL: Omit<Product, "_id"> = {
 };
 
 export default function AdminPanel() {
-  const [form, setForm] = useState(INITIAL);
+  const [form, setForm] = useState<Omit<Product, "_id">>(INITIAL);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const handleChange = (key: keyof typeof form, value: any) => {
+  // Maneja cambios simples
+  const handleChange = (key: keyof typeof form, value: unknown) => {
     setForm({ ...form, [key]: value });
   };
 
+  // Maneja compatibles desde el textarea (códigos separados por coma)
   const handleCompatibles = (value: string) => {
-    // Convierte la lista separada por comas a array de string (limpia espacios)
     setForm({
       ...form,
       compatibles: value
         .split(",")
         .map((s) => s.trim())
-        .filter(Boolean),
+        .filter(Boolean)
+        .map((code) => ({ code, type: "" })),
     });
   };
 
+  // Enviar producto individual
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -62,7 +65,7 @@ export default function AdminPanel() {
     setLoading(false);
   };
 
-  // --- CARGA MASIVA ---
+  // CARGA MASIVA DESDE EXCEL
   const handleFileUpload = async (file: File | null) => {
     if (!file) return;
     setLoading(true);
@@ -73,7 +76,7 @@ export default function AdminPanel() {
     const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
     // Procesa productos principales y compatibles
-    let currentPrincipal: any = null;
+    let currentPrincipal: Omit<Product, "_id"> | null = null;
     const productos: Omit<Product, "_id">[] = [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -105,7 +108,13 @@ export default function AdminPanel() {
         };
       } else if (currentPrincipal && row.Codigo && row.ARTICULO) {
         // Es compatible del producto principal actual
-        currentPrincipal.compatibles.push(String(row.Codigo));
+        if (!currentPrincipal.compatibles) {
+          currentPrincipal.compatibles = [];
+        }
+        currentPrincipal.compatibles.push({
+          code: String(row.Codigo),
+          type: row.TipoCompatible || "", // Puedes ajustar si tienes columna de tipo
+        });
       }
     }
     if (currentPrincipal) productos.push(currentPrincipal);
@@ -170,7 +179,7 @@ export default function AdminPanel() {
         />
         <Textarea
           label="Compatibles (códigos separados por coma)"
-          value={(form.compatibles ?? []).join(", ")}
+          value={(form.compatibles ?? []).map((c) => c.code).join(", ")}
           onChange={(e) => handleCompatibles(e.target.value)}
         />
         <NumberInput
@@ -201,7 +210,11 @@ export default function AdminPanel() {
       </Card>
 
       {success && (
-        <Notification color="teal" mt="md" onClose={() => setSuccess(null)}>
+        <Notification
+          color={success.includes("Error") ? "red" : "teal"}
+          mt="md"
+          onClose={() => setSuccess(null)}
+        >
           {success}
         </Notification>
       )}
