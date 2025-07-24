@@ -15,6 +15,15 @@ export const createProduct = async (product: Omit<Product, "_id">) => {
   await axios.post(API_URL, product);
 };
 
+export const searchProducts = async (query: string, categories: string[]) => {
+  const res = await axios.post<ProductsResponse>(
+    `${API_URL}/search`,
+    { query, categories }
+  );
+  return res.data;
+};
+
+
 export const fetchProducts = async (): Promise<ProductsResponse> => {
   const res = await axios.get<ProductsResponse>(API_URL);
   return res.data;

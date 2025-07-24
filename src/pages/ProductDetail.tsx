@@ -1,143 +1,275 @@
-// import { useEffect, useState } from "react";
-// import { useParams, useNavigate } from "react-router-dom";
-// import {
-//   fetchProductById,
-//   fetchProductsByCodes,
-// } from "../services/productService";
-// import {
-//   Card,
-//   Button,
-//   Loader,
-//   Image,
-//   Text,
-//   Group,
-//   Stack,
-//   SimpleGrid,
-//   Title,
-// } from "@mantine/core";
-// import type { Product } from "../types/Product";
+import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  Box,
+  Button,
+  Card,
+  Group,
+  SimpleGrid,
+  Text,
+  Image,
+  Stack,
+  Badge,
+  Divider,
+  Flex,
+  Paper,
+} from "@mantine/core";
+import { fetchProducts } from "../services/productService";
+import type { Product } from "../types/Product";
+import CustomLoader from "../components/CustomLoader";
 
-// export default function ProductDetail() {
-//   const { code } = useParams<{ code: string }>();
-//   const [product, setProduct] = useState<Product | null>(null);
-//   const [loading, setLoading] = useState(true);
-//   const [compatibles, setCompatibles] = useState<Product[]>([]);
-//   const [loadingCompatibles, setLoadingCompatibles] = useState(false);
-//   const navigate = useNavigate();
+export default function ProductDetail() {
+  const { code } = useParams();
+  const navigate = useNavigate();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [compatibles, setCompatibles] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-//   useEffect(() => {
-//     if (!code) return;
-//     setLoading(true);
-//     fetchProductById(code).then((data) => {
-//       setProduct(data);
-//       setLoading(false);
+  useEffect(() => {
+    fetchProducts().then((data) => {
+      const realCode = code ? decodeURIComponent(code) : "";
+      const found = data.products.find((p: Product) => p.code === realCode);
+      setProduct(found || null);
 
-//       // Cargar compatibles si existen
-//       if (data.compatibles && data.compatibles.length > 0) {
-//         setLoadingCompatibles(true);
-//         fetchProductsByCodes(data.compatibles)
-//           .then((res) => setCompatibles(res))
-//           .finally(() => setLoadingCompatibles(false));
-//       } else {
-//         setCompatibles([]);
-//       }
-//     });
-//   }, [code]);
+      if (found?.compatibles && found.compatibles.length > 0) {
+        const compatiblesCodes = found.compatibles.map((c) => c.code);
+        const codesSet = new Set(
+          compatiblesCodes.map((c) => c.trim().toLowerCase())
+        );
+        const compatiblesList = data.products.filter((p: Product) =>
+          codesSet.has(p.code.trim().toLowerCase())
+        );
+        setCompatibles(compatiblesList);
+      } else {
+        setCompatibles([]);
+      }
+      setLoading(false);
+    });
+  }, [code]);
 
-//   if (loading || !product) return <Loader />;
+  if (loading) return <CustomLoader />;
 
-//   return (
-//     <Stack gap={0}>
-//       {/* Detalle del producto principal */}
-//       <Card shadow="sm" padding="lg" radius="md" withBorder mb="xl">
-//         <Group align="flex-start" gap={32}>
-//           <Image
-//             src={product.image || ""}
-//             alt={product.name || "Producto"}
-//             width={280}
-//             radius="md"
-//             fallbackSrc="https://via.placeholder.com/280x280?text=Sin+Imagen"
-//           />
-//           <Stack>
-//             <Title order={2}>{product.name}</Title>
-//             <Text size="lg" c="dimmed">
-//               {product.brand}
-//             </Text>
-//             <Text size="sm" c="gray">
-//               Código: {product.code}
-//             </Text>
-//             <Text size="md" mt="md">
-//               Categoría: <b>{product.group || "Sin categoría"}</b>
-//             </Text>
-//             {product.datasheet && (
-//               <Button
-//                 variant="subtle"
-//                 component="a"
-//                 href={product.datasheet}
-//                 target="_blank"
-//                 rel="noopener noreferrer"
-//                 mt="md"
-//               >
-//                 Ver ficha técnica ↗
-//               </Button>
-//             )}
-//             <Button color="dark" radius="md" mt="lg">
-//               Agregar al carrito
-//             </Button>
-//           </Stack>
-//         </Group>
-//       </Card>
+  if (!product) {
+    return (
+      <Box p="xl">
+        <Text fw={700} size="xl" mb="lg">
+          Producto no encontrado
+        </Text>
+        <Button variant="outline" onClick={() => navigate("/productos")}>
+          Volver al catálogo
+        </Button>
+      </Box>
+    );
+  }
 
-//       {/* Compatibles */}
-//       <Title order={4} mt="lg" mb="xs">
-//         Productos compatibles
-//       </Title>
-//       {loadingCompatibles ? (
-//         <Loader />
-//       ) : compatibles.length > 0 ? (
-//         <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="md">
-//           {compatibles.map((comp) => (
-//             <Card
-//               key={comp.code}
-//               withBorder
-//               radius="md"
-//               style={{ background: "#fafafa" }}
-//             >
-//               <Card.Section>
-//                 <Image
-//                   src={comp.image || ""}
-//                   alt={comp.name || "Compatible"}
-//                   height={120}
-//                   fallbackSrc="https://via.placeholder.com/200x120?text=Sin+Imagen"
-//                   style={{ objectFit: "cover" }}
-//                 />
-//               </Card.Section>
-//               <Stack align="center" gap={0} py="sm">
-//                 <Text size="md" fw={500}>
-//                   {comp.name}
-//                 </Text>
-//                 <Text size="sm" c="dimmed">
-//                   {comp.code}
-//                 </Text>
-//               </Stack>
-//               <Button
-//                 variant="light"
-//                 fullWidth
-//                 size="xs"
-//                 radius="md"
-//                 mt="sm"
-//                 onClick={() => navigate(`/product/${comp.code}`)}
-//               >
-//                 Ver detalle
-//               </Button>
-//             </Card>
-//           ))}
-//         </SimpleGrid>
-//       ) : (
-//         <Text c="dimmed" mt="sm">
-//           No hay productos compatibles registrados.
-//         </Text>
-//       )}
-//     </Stack>
-//   );
-// }
+  return (
+    <Box maw={950} mx="auto" pt="xl" pb="lg" px="md">
+      {/* Breadcrumb y botón volver */}
+      <Group mb="md" gap="xs">
+        <Button variant="light" size="xs" onClick={() => navigate("/productos")}>
+          ← Catálogo
+        </Button>
+        <Text c="dimmed" size="sm" mx={5}>
+          /
+        </Text>
+        <Text size="sm" c="gray">
+          {product.name}
+        </Text>
+      </Group>
+
+      {/* Card principal */}
+      <Paper
+        shadow="md"
+        radius="xl"
+        p={0}
+        mb="xl"
+        style={{
+          background: "linear-gradient(110deg,#f8fafc 80%,#e9ecef 100%)",
+          boxShadow: "0 4px 32px 0 #e9e9e9",
+        }}
+      >
+        <Flex
+          direction={{ base: "column", md: "row" }}
+          gap={36}
+          align="flex-start"
+          p={{ base: "xl", md: 32 }}
+        >
+          <Image
+            src={product.image || ""}
+            alt={product.name || "Producto"}
+            width={200}
+            height={200}
+            fit="contain"
+            fallbackSrc="https://via.placeholder.com/200x200?text=Sin+Imagen"
+            style={{ borderRadius: 16, background: "#fff" }}
+          />
+
+          <Stack gap={6} w="100%">
+            <Group gap="xs" mb={4}>
+              <Badge color="gray" size="sm" variant="light">
+                {product.type || "Sin tipo"}
+              </Badge>
+              {product.line && (
+                <Badge color="blue" size="sm" variant="light">
+                  {product.line}
+                </Badge>
+              )}
+              {product.brand && (
+                <Badge color="indigo" size="sm" variant="light">
+                  {product.brand}
+                </Badge>
+              )}
+              {product.stock === 0 && (
+                <Badge color="red" size="sm" variant="filled">
+                  Sin stock
+                </Badge>
+              )}
+            </Group>
+
+            <Text fw={700} size="2xl" lh={1.2}>
+              {product.name}
+            </Text>
+            <Text c="dimmed" size="sm" mb={2}>
+              Código: <b>{product.code}</b>
+            </Text>
+            {product.provider && (
+              <Text size="sm" c="dimmed">
+                Proveedor: {product.provider}
+              </Text>
+            )}
+            {product.group && (
+              <Text size="sm" c="dimmed">
+                Grupo: {product.group}
+              </Text>
+            )}
+
+            <Group gap={24} mt={14} mb={2}>
+              <Text size="xl" fw={600} color="dark">
+                {product.price ? `$${product.price.toLocaleString()}` : <span style={{color:"#ccc"}}>Sin precio</span>}
+              </Text>
+              <Text size="sm" c="dimmed">
+                Stock:{" "}
+                <b>
+                  {product.stock === undefined
+                    ? "-"
+                    : product.stock === 0
+                    ? "Sin stock"
+                    : product.stock}
+                </b>
+              </Text>
+            </Group>
+
+            <Group mt={16} gap={14}>
+              <Button size="lg" radius="xl" color="dark">
+                Agregar al carrito
+              </Button>
+              {/* {product.datasheet && ( */}
+                <Button
+                  variant="outline"
+                  size="md"
+                  radius="xl"
+                  component="a"
+                  href={product.datasheet}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="gray"
+                  leftSection="↗"
+                  px={16}
+                >
+                  Ficha técnica
+                </Button>
+              {/* )} */}
+            </Group>
+          </Stack>
+        </Flex>
+      </Paper>
+
+      <Divider my="xl" label="Compatibles" labelPosition="center" />
+
+      {/* Compatibles */}
+      <Text fw={700} size="lg" mb={8}>
+        {compatibles.length === 0
+          ? "Sin productos compatibles"
+          : `Productos compatibles (${compatibles.length})`}
+      </Text>
+      {compatibles.length === 0 ? (
+        <Text c="dimmed" mb="xl">
+          Este producto no tiene productos compatibles registrados.
+        </Text>
+      ) : (
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg" mb="lg">
+          {compatibles.map((comp) => (
+            <Card
+              key={comp.code}
+              withBorder
+              radius="xl"
+              shadow="md"
+              style={{
+                background: "#f8fafc",
+                minHeight: 230,
+                cursor: "pointer",
+                border: "2px solid #f1f3f6",
+                transition: "box-shadow 0.2s, border 0.2s",
+              }}
+              onClick={() =>
+                navigate(`/product/${encodeURIComponent(comp.code)}`)
+              }
+              onMouseOver={e => (e.currentTarget.style.border = '2px solid #777')}
+              onMouseOut={e => (e.currentTarget.style.border = '2px solid #f1f3f6')}
+            >
+              <Card.Section style={{ position: "relative", margin: "10px 10px 0 10px" }}>
+                <Image
+                  src={comp.image || ""}
+                  alt={comp.name || "Producto"}
+                  height={110}
+                  fit="contain"
+                  fallbackSrc="https://via.placeholder.com/180x110?text=Sin+Imagen"
+                  style={{ objectFit: "cover", borderRadius: 12, background: "#fff" }}
+                />
+              </Card.Section>
+              <Stack align="center" gap={0} mt="md">
+                <Text size="md" fw={600}>
+                  {comp.name}
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {comp.code}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {comp.type || "Sin tipo"}
+                </Text>
+              </Stack>
+              <Button
+                size="xs"
+                radius="xl"
+                color="dark"
+                mt={12}
+                mb={6}
+                fullWidth
+              >
+                Agregar al carrito
+              </Button>
+              {comp.datasheet && (
+                <Text
+                  component="a"
+                  href={comp.datasheet}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  size="sm"
+                  mt="xs"
+                  c="blue"
+                  style={{
+                    textAlign: "center",
+                    textDecoration: "underline",
+                    display: "block",
+                  }}
+                >
+                  Ver ficha técnica ↗
+                </Text>
+              )}
+            </Card>
+          ))}
+        </SimpleGrid>
+      )}
+    </Box>
+  );
+}

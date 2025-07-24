@@ -8,17 +8,13 @@ import {
   Stack,
   Divider,
   Flex,
+  CloseButton,
 } from "@mantine/core";
 import { IconSearch, IconCameraPlus } from "@tabler/icons-react";
-import { useState, useRef, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import type { Product } from "../types/Product";
 
-interface ProductSearchHeroProps {
-  products: Product[];
-  onSelectProduct?: (product: Product) => void;
-}
-
-// Helper para resaltar coincidencias en bold
+// Helper para resaltar coincidencias
 function highlightBold(text: string, query: string) {
   if (!query) return text;
   const regex = new RegExp(
@@ -37,15 +33,28 @@ function highlightBold(text: string, query: string) {
   );
 }
 
+interface ProductSearchHeroProps {
+  products: Product[];
+  search: string;
+  setSearch: (v: string) => void;
+  onSelectSuggestion?: (s: string) => void;
+  onSelectProduct?: (product: Product) => void;
+  onEnter?: () => void;
+  loading?: boolean;
+}
+
 export default function ProductSearchHero({
   products,
+  search,
+  setSearch,
+  onSelectSuggestion,
   onSelectProduct,
+  onEnter,
+  loading = false,
 }: ProductSearchHeroProps) {
-  const [search, setSearch] = useState("");
+  const [shouldShowPanel, setShouldShowPanel] = useState(false);
   const [, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const [shouldShowPanel, setShouldShowPanel] = useState(false);
 
   function handleFocus() {
     setFocused(true);
@@ -56,10 +65,10 @@ export default function ProductSearchHero({
     setTimeout(() => {
       setShouldShowPanel(false);
       setFocused(false);
-    }, 120); // Tiempo para permitir clic en sugerencia
+    }, 120); // permite click en sugerencia
   }
 
-  // Sugerencias de búsqueda únicas (palabras/frases)
+  // Sugerencias únicas, ejemplo con nombre y grupo
   const suggestions = Array.from(
     new Set(
       products
@@ -73,7 +82,7 @@ export default function ProductSearchHero({
     search.length > 0 ? s.toLowerCase().includes(search.toLowerCase()) : false
   );
 
-  // Productos recomendados
+  // Productos recomendados actuales
   const recommendations = products.filter(
     (prod) =>
       search.length > 0 &&
@@ -81,11 +90,12 @@ export default function ProductSearchHero({
         prod.code?.toLowerCase().includes(search.toLowerCase()))
   );
 
-  // Para cerrar el panel cuando se hace click fuera
+  // Panel: cerrar si click fuera
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function handleClick(event: MouseEvent) {
       if (ref.current && !ref.current.contains(event.target as Node)) {
+        setShouldShowPanel(false);
         setFocused(false);
       }
     }
@@ -118,8 +128,24 @@ export default function ProductSearchHero({
           ref={inputRef}
           leftSection={<IconSearch size={22} />}
           rightSection={
-            <IconCameraPlus size={22} style={{ cursor: "pointer" }} />
+            <>
+              <CloseButton
+                aria-label="Clear input"
+                onClick={() => {
+                  setSearch("");
+                  setShouldShowPanel(false); // opcional: cierra panel de sugerencias al limpiar
+                }}
+                style={{ display: search ? undefined : "none" }}
+              />
+              {!search && (
+                <IconCameraPlus
+                  size={22}
+                  style={{ cursor: "pointer", marginLeft: 4 }}
+                />
+              )}
+            </>
           }
+          rightSectionPointerEvents="all"
           radius="md"
           size="lg"
           placeholder="Escribe aquí nombre o referencia del producto"
@@ -129,6 +155,13 @@ export default function ProductSearchHero({
           onFocus={handleFocus}
           onBlur={handleBlur}
           style={{ flex: 1 }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && onEnter) {
+              onEnter();
+              setShouldShowPanel(false); // opcional
+            }
+          }}
+          disabled={loading}
         />
       </Group>
 
@@ -179,19 +212,18 @@ export default function ProductSearchHero({
                       borderRadius: 7,
                       px: 5,
                       transition: "background 0.15s",
-                      "&:hover": {
-                        background: "#f6f6f6",
-                        color: "#222",
-                      },
                     }}
-                    onMouseDown={() => setSearch(sug)}
+                    onMouseDown={() => {
+                      setSearch(sug);
+                      onSelectSuggestion?.(sug);
+                      setShouldShowPanel(false);
+                    }}
                   >
                     {highlightBold(sug, search)}
                   </Text>
                 ))}
               </Flex>
             </Stack>
-
             <Divider orientation="vertical" mx={0} />
             {/* Recomendaciones de producto */}
             <Box style={{ flex: 1.1 }}>
@@ -215,7 +247,6 @@ export default function ProductSearchHero({
                         background: "#fafafa",
                         marginBottom: 12,
                         cursor: "pointer",
-                        transition: "box-shadow 0.15s, border 0.15s",
                         border: "1.5px solid #f2f2f2",
                         width: "100%",
                         minHeight: 84,
@@ -225,8 +256,7 @@ export default function ProductSearchHero({
                       }}
                       onMouseDown={() => {
                         onSelectProduct?.(prod);
-                        setSearch("");
-                        setFocused(false);
+                        setShouldShowPanel(false);
                       }}
                       onMouseOver={(e) =>
                         (e.currentTarget.style.boxShadow = "0 0 0 2px #ffd43b")
