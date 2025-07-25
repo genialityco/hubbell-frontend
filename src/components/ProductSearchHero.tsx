@@ -12,6 +12,7 @@ import {
 } from "@mantine/core";
 import { IconSearch, IconCameraPlus } from "@tabler/icons-react";
 import { useRef, useState, useEffect } from "react";
+import { useMediaQuery } from "@mantine/hooks";
 import type { Product } from "../types/Product";
 
 // Helper para resaltar coincidencias
@@ -56,6 +57,8 @@ export default function ProductSearchHero({
   const [, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const isMobile = useMediaQuery("(max-width: 48em)");
+
   function handleFocus() {
     setFocused(true);
     setShouldShowPanel(true);
@@ -65,10 +68,9 @@ export default function ProductSearchHero({
     setTimeout(() => {
       setShouldShowPanel(false);
       setFocused(false);
-    }, 120); // permite click en sugerencia
+    }, 120);
   }
 
-  // Sugerencias únicas, ejemplo con nombre y grupo
   const suggestions = Array.from(
     new Set(
       products
@@ -82,7 +84,6 @@ export default function ProductSearchHero({
     search.length > 0 ? s.toLowerCase().includes(search.toLowerCase()) : false
   );
 
-  // Productos recomendados actuales
   const recommendations = products.filter(
     (prod) =>
       search.length > 0 &&
@@ -107,23 +108,44 @@ export default function ProductSearchHero({
     <Paper
       radius={0}
       bg="#ededed"
-      py={20}
-      px={0}
+      py={isMobile ? 16 : 20}
+      px={isMobile ? 6 : 0}
       style={{
-        minHeight: 280,
+        minHeight: isMobile ? 210 : 280,
         borderBottom: "1px solid #e4e4e4",
         textAlign: "center",
         position: "relative",
       }}
     >
-      <Text fw={700} style={{ fontFamily: "inherit", fontSize: "24px" }}>
+      <Text
+        fw={700}
+        style={{
+          fontFamily: "inherit",
+          fontSize: isMobile ? "20px" : "24px",
+          lineHeight: 1.1,
+        }}
+      >
         Búsqueda de producto
       </Text>
-      <Text size="lg" mt="md" mb={40} c="dimmed">
-        Escribe el nombre o referencia del producto, o sube una imagen para ver
-        productos compatibles disponibles.
+      <Text
+        size={isMobile ? "md" : "lg"}
+        mt="md"
+        mb={isMobile ? 18 : 40}
+        c="dimmed"
+      >
+        Escribe el nombre o referencia del producto,
+        {isMobile ? <br /> : " "}
+        o sube una imagen para ver productos compatibles disponibles.
       </Text>
-      <Group justify="center" mx="auto" maw={520}>
+      <Group
+        justify="center"
+        mx="auto"
+        maw={isMobile ? "100%" : 520}
+        w="100%"
+        style={{
+          padding: isMobile ? 0 : undefined,
+        }}
+      >
         <Input
           ref={inputRef}
           leftSection={<IconSearch size={22} />}
@@ -133,7 +155,7 @@ export default function ProductSearchHero({
                 aria-label="Clear input"
                 onClick={() => {
                   setSearch("");
-                  setShouldShowPanel(false); // opcional: cierra panel de sugerencias al limpiar
+                  setShouldShowPanel(false);
                 }}
                 style={{ display: search ? undefined : "none" }}
               />
@@ -147,18 +169,22 @@ export default function ProductSearchHero({
           }
           rightSectionPointerEvents="all"
           radius="md"
-          size="lg"
+          size={isMobile ? "md" : "lg"}
           placeholder="Escribe aquí nombre o referencia del producto"
           bg="#eaf6fb"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          style={{ flex: 1 }}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: isMobile ? 15 : 18,
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && onEnter) {
               onEnter();
-              setShouldShowPanel(false); // opcional
+              setShouldShowPanel(false);
             }
           }}
           disabled={loading}
@@ -170,29 +196,31 @@ export default function ProductSearchHero({
           ref={ref}
           pos="absolute"
           left="50%"
-          top={200}
+          top={isMobile ? 190 : 190}
           style={{
             transform: "translateX(-50%)",
-            width: 730,
+            width: isMobile ? "92vw" : 730,
             zIndex: 20,
+            maxWidth: isMobile ? "98vw" : 900,
           }}
         >
           <Paper
-            p="xl"
+            p={isMobile ? "md" : "xl"}
             radius="lg"
             shadow="xl"
             style={{
               background: "#fff",
               border: "1.5px solid #ededed",
-              display: "flex",
-              alignItems: "start",
-              gap: 32,
+              display: isMobile ? "block" : "flex",
+              alignItems: isMobile ? "stretch" : "start",
+              gap: isMobile ? 18 : 32,
+              fontSize: isMobile ? 15 : 16,
             }}
           >
             {/* Sugerencias */}
-            <Stack gap={3}>
+            <Stack gap={isMobile ? 2 : 3} mb={isMobile ? 20 : 0}>
               <Flex align="start" direction="column">
-                <Text size="md" fw={400} mb={12}>
+                <Text size={isMobile ? "sm" : "md"} fw={400} mb={10}>
                   Sugerencias de búsqueda
                 </Text>
                 {suggestions.length === 0 && (
@@ -203,15 +231,17 @@ export default function ProductSearchHero({
                 {suggestions.slice(0, 8).map((sug) => (
                   <Text
                     fw={400}
-                    size="lg"
+                    size={isMobile ? "md" : "lg"}
                     my="xs"
                     key={sug}
                     component="span"
                     style={{
                       cursor: "pointer",
                       borderRadius: 7,
-                      px: 5,
+                      paddingLeft: 5,
+                      paddingRight: 5,
                       transition: "background 0.15s",
+                      fontSize: isMobile ? 15 : 17,
                     }}
                     onMouseDown={() => {
                       setSearch(sug);
@@ -224,12 +254,16 @@ export default function ProductSearchHero({
                 ))}
               </Flex>
             </Stack>
-            <Divider orientation="vertical" mx={0} />
+            <Divider
+              orientation={isMobile ? "horizontal" : "vertical"}
+              mx={isMobile ? 0 : 8}
+              my={isMobile ? 8 : 0}
+            />
             {/* Recomendaciones de producto */}
             <Box style={{ flex: 1.1 }}>
-              <Stack gap={7}>
+              <Stack gap={isMobile ? 4 : 7}>
                 <Flex align="start" direction="column">
-                  <Text size="md" fw={400} mb={12}>
+                  <Text size={isMobile ? "sm" : "md"} fw={400} mb={10}>
                     Recomendaciones de productos
                   </Text>
                   {recommendations.length === 0 && (
@@ -249,7 +283,7 @@ export default function ProductSearchHero({
                         cursor: "pointer",
                         border: "1.5px solid #f2f2f2",
                         width: "100%",
-                        minHeight: 84,
+                        minHeight: isMobile ? 60 : 84,
                         display: "flex",
                         alignItems: "center",
                         gap: 0,
@@ -267,8 +301,8 @@ export default function ProductSearchHero({
                     >
                       <Image
                         src={prod.image || ""}
-                        w={80}
-                        h={80}
+                        w={isMobile ? 60 : 80}
+                        h={isMobile ? 60 : 80}
                         radius="md"
                         fit="cover"
                         alt={prod.name}
@@ -278,9 +312,9 @@ export default function ProductSearchHero({
                       <Flex direction="column" align="start">
                         <Text
                           fw={700}
-                          size="md"
+                          size={isMobile ? "sm" : "md"}
                           lh={1.1}
-                          style={{ fontSize: 18 }}
+                          style={{ fontSize: isMobile ? 15 : 18 }}
                         >
                           {prod.name}
                         </Text>
