@@ -10,7 +10,7 @@ import {
   Flex,
   CloseButton,
 } from "@mantine/core";
-import { IconSearch, IconCameraPlus } from "@tabler/icons-react";
+import { IconSearch } from "@tabler/icons-react";
 import { useRef, useState, useEffect } from "react";
 import { useMediaQuery } from "@mantine/hooks";
 import type { Product } from "../types/Product";
@@ -42,6 +42,7 @@ interface ProductSearchHeroProps {
   onSelectProduct?: (product: Product) => void;
   onEnter?: () => void;
   loading?: boolean;
+  onClear?: () => void;
 }
 
 export default function ProductSearchHero({
@@ -52,6 +53,7 @@ export default function ProductSearchHero({
   onSelectProduct,
   onEnter,
   loading = false,
+  onClear,
 }: ProductSearchHeroProps) {
   const [shouldShowPanel, setShouldShowPanel] = useState(false);
   const [, setFocused] = useState(false);
@@ -110,33 +112,49 @@ export default function ProductSearchHero({
       bg="#ededed"
       py={isMobile ? 16 : 20}
       px={isMobile ? 6 : 0}
+      // Ajusta el alto dependiendo si hay búsqueda
       style={{
-        minHeight: isMobile ? 210 : 280,
+        minHeight:
+          search.length === 0
+            ? isMobile
+              ? 210
+              : 210
+            : isMobile
+            ? 90 // mucho más compacto en móvil
+            : 120, // más compacto en desktop
         borderBottom: "1px solid #e4e4e4",
         textAlign: "center",
         position: "relative",
+        transition: "min-height 0.2s", // Suaviza la transición
       }}
     >
-      <Text
-        fw={700}
-        style={{
-          fontFamily: "inherit",
-          fontSize: isMobile ? "20px" : "24px",
-          lineHeight: 1.1,
-        }}
-      >
-        Búsqueda de producto
-      </Text>
-      <Text
-        size={isMobile ? "md" : "lg"}
-        mt="md"
-        mb={isMobile ? 18 : 40}
-        c="dimmed"
-      >
-        Escribe el nombre o referencia del producto,
-        {isMobile ? <br /> : " "}
-        o sube una imagen para ver productos compatibles disponibles.
-      </Text>
+      {/* Textos solo si NO hay búsqueda */}
+      {search.length === 0 && (
+        <>
+          <Text
+            fw={700}
+            style={{
+              fontFamily: "inherit",
+              fontSize: isMobile ? "20px" : "24px",
+              lineHeight: 1.1,
+            }}
+          >
+            Búsqueda de producto
+          </Text>
+          <Text
+            size={isMobile ? "md" : "lg"}
+            mt="md"
+            mb={isMobile ? 18 : 40}
+            c="dimmed"
+          >
+            Escribe el nombre o referencia del producto,
+            {isMobile ? <br /> : " "}o sube una imagen para ver productos
+            compatibles disponibles.
+          </Text>
+        </>
+      )}
+
+      {/* Input */}
       <Group
         justify="center"
         mx="auto"
@@ -156,15 +174,16 @@ export default function ProductSearchHero({
                 onClick={() => {
                   setSearch("");
                   setShouldShowPanel(false);
+                  onClear?.();
                 }}
                 style={{ display: search ? undefined : "none" }}
               />
-              {!search && (
+              {/* {!search && (
                 <IconCameraPlus
                   size={22}
                   style={{ cursor: "pointer", marginLeft: 4 }}
                 />
-              )}
+              )} */}
             </>
           }
           rightSectionPointerEvents="all"
@@ -173,7 +192,12 @@ export default function ProductSearchHero({
           placeholder="Escribe aquí nombre o referencia del producto"
           bg="#eaf6fb"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            if (e.target.value === "") {
+              onClear?.();
+            }
+          }}
           onFocus={handleFocus}
           onBlur={handleBlur}
           style={{
@@ -196,12 +220,22 @@ export default function ProductSearchHero({
           ref={ref}
           pos="absolute"
           left="50%"
-          top={isMobile ? 190 : 190}
+          // Ajusta el top según si hay textos introductorios o no
+          top={
+            search.length === 0
+              ? isMobile
+                ? 190 // Espacio cuando están los textos arriba
+                : 190
+              : isMobile
+              ? 60 // Mucho más pegado cuando solo está el input
+              : 75 // También más pegado en desktop
+          }
           style={{
             transform: "translateX(-50%)",
             width: isMobile ? "92vw" : 730,
             zIndex: 20,
             maxWidth: isMobile ? "98vw" : 900,
+            transition: "top 0.18s", // Suave animación
           }}
         >
           <Paper

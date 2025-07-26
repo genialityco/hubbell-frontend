@@ -1,0 +1,4 @@
+.product-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  border: 2px solid #777;
+}

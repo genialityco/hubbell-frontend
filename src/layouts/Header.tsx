@@ -1,6 +1,6 @@
 // src/components/Header.tsx
 import { Container, Group, rem } from "@mantine/core";
-import { IconHeart, IconShoppingCart } from "@tabler/icons-react";
+// import { IconHeart, IconShoppingCart } from "@tabler/icons-react";
 import logo from "../assets/logo.png"; // Cambia esta ruta por la real de tu logo
 
 export default function Header() {
@@ -12,10 +12,10 @@ export default function Header() {
           <img src={logo} alt="Logo Hubbell" width={110} />
 
           {/* Íconos de usuario */}
-          <Group gap="xs">
+          {/* <Group gap="xs">
             <IconHeart size={26} style={{ cursor: "pointer" }} />
             <IconShoppingCart size={26} style={{ cursor: "pointer" }} />
-          </Group>
+          </Group> */}
         </Group>
       </Container>
     </header>

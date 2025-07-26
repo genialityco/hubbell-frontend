@@ -5,8 +5,6 @@ import {
   Stack,
   Text,
   SimpleGrid,
-  Card,
-  Image,
   Group,
   ScrollArea,
   Flex,
@@ -19,22 +17,20 @@ import {
 import { useMediaQuery } from "@mantine/hooks";
 import type { Product } from "../types/Product";
 import { searchProducts } from "../services/productService";
-import { useNavigate } from "react-router-dom";
 import ProductSearchHero from "../components/ProductSearchHero";
 import CustomLoader from "../components/CustomLoader";
 import { IconFilter } from "@tabler/icons-react";
+import ProductCard from "../components/ProductCard";
 
+type FilterOption = { name: string; count: number };
 type CategoryFilterProps = {
-  categoryOptions: string[];
-  products: Product[];
+  filterOptions: FilterOption[];
   selectedCategories: string[];
   onChange: (cats: string[]) => void;
 };
 
-// Sidebar desktop/tablet
 function CategorySidebarFilter({
-  categoryOptions,
-  products,
+  filterOptions,
   selectedCategories,
   onChange,
 }: CategoryFilterProps) {
@@ -54,35 +50,35 @@ function CategorySidebarFilter({
       <Divider my="sm" />
       <ScrollArea.Autosize mah={360} type="scroll">
         <Stack>
-          {categoryOptions.map((cat) => {
-            const filteredCount = products.filter(
-              (prod) => (prod.type || "Sin tipo") === cat
-            ).length;
-            return (
-              <Checkbox
-                key={cat}
-                label={
-                  <Group gap={6}>
-                    <Text size="sm">{cat}</Text>
-                    <Text size="xs" c="dimmed">
-                      ({filteredCount})
-                    </Text>
-                  </Group>
+          {filterOptions.map(({ name, count }) => (
+            <Checkbox
+              key={name}
+              label={
+                <Group gap={6}>
+                  <Text size="sm">{name}</Text>
+                  <Text size="xs" c="dimmed">
+                    ({count})
+                  </Text>
+                </Group>
+              }
+              checked={selectedCategories.includes(name)}
+              // 👇 NUNCA disables el checkbox
+              // disabled={false}
+              style={{
+                opacity: 1, // Opcional: si quieres grisar cuando count 0, pon: count === 0 ? 0.65 : 1
+              }}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                if (checked) {
+                  onChange([...selectedCategories, name]);
+                } else {
+                  onChange(selectedCategories.filter((c) => c !== name));
                 }
-                checked={selectedCategories.includes(cat)}
-                onChange={(e) => {
-                  const checked = e.currentTarget.checked;
-                  if (checked) {
-                    onChange([...selectedCategories, cat]);
-                  } else {
-                    onChange(selectedCategories.filter((c) => c !== cat));
-                  }
-                }}
-                mb={2}
-                size="sm"
-              />
-            );
-          })}
+              }}
+              mb={2}
+              size="sm"
+            />
+          ))}
         </Stack>
       </ScrollArea.Autosize>
       <Group gap={8} mt="lg">
@@ -90,7 +86,7 @@ function CategorySidebarFilter({
           variant="default"
           color="gray"
           size="xs"
-          onClick={() => onChange(categoryOptions)}
+          onClick={() => onChange(filterOptions.map((f) => f.name))}
         >
           Seleccionar todos
         </Button>
@@ -107,10 +103,8 @@ function CategorySidebarFilter({
   );
 }
 
-// Filtro menú mobile
 function CategoryMenuFilter({
-  categoryOptions,
-  products,
+  filterOptions,
   selectedCategories,
   onChange,
 }: CategoryFilterProps) {
@@ -134,35 +128,35 @@ function CategoryMenuFilter({
       </Menu.Target>
       <Menu.Dropdown>
         <Stack gap={2} p="sm">
-          {categoryOptions.map((cat) => {
-            const filteredCount = products.filter(
-              (prod) => (prod.type || "Sin tipo") === cat
-            ).length;
-            return (
-              <Checkbox
-                key={cat}
-                label={
-                  <Group gap={6}>
-                    <Text size="sm">{cat}</Text>
-                    <Text size="xs" c="dimmed">
-                      ({filteredCount})
-                    </Text>
-                  </Group>
+          {filterOptions.map(({ name, count }) => (
+            <Checkbox
+              key={name}
+              label={
+                <Group gap={6}>
+                  <Text size="sm">{name}</Text>
+                  <Text size="xs" c="dimmed">
+                    ({count})
+                  </Text>
+                </Group>
+              }
+              checked={selectedCategories.includes(name)}
+              disabled={count === 0 && !selectedCategories.includes(name)}
+              style={{
+                opacity:
+                  count === 0 && !selectedCategories.includes(name) ? 0.5 : 1,
+              }}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                if (checked) {
+                  onChange([...selectedCategories, name]);
+                } else {
+                  onChange(selectedCategories.filter((c) => c !== name));
                 }
-                checked={selectedCategories.includes(cat)}
-                onChange={(e) => {
-                  const checked = e.currentTarget.checked;
-                  if (checked) {
-                    onChange([...selectedCategories, cat]);
-                  } else {
-                    onChange(selectedCategories.filter((c) => c !== cat));
-                  }
-                }}
-                mb={2}
-                size="sm"
-              />
-            );
-          })}
+              }}
+              mb={2}
+              size="sm"
+            />
+          ))}
         </Stack>
         <Button
           variant="default"
@@ -170,7 +164,7 @@ function CategoryMenuFilter({
           fullWidth
           size="xs"
           mt="xs"
-          onClick={() => onChange(categoryOptions)}
+          onClick={() => onChange(filterOptions.map((f) => f.name))}
         >
           Seleccionar todos
         </Button>
@@ -190,73 +184,120 @@ function CategoryMenuFilter({
 }
 
 export default function Home() {
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+  const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
 
   const isMobile = useMediaQuery("(max-width: 48em)");
 
-  // Cargar todo al inicio
-  useEffect(() => {
-    searchProducts("", []).then((data) => {
-      setProducts(data.products);
-      setAllProducts(data.products);
-      setLoading(false);
+  // Siempre mostrar los filtros seleccionados aunque estén en 0
+  const mergedFilterOptions = [
+    ...filterOptions,
+    ...selectedCategories
+      .filter((cat) => !filterOptions.some((f) => f.name === cat))
+      .map((name) => ({ name, count: 0 })),
+  ];
 
-      const types = Array.from(
-        new Set(data.products.map((prod: Product) => prod.type || "Sin tipo"))
-      );
-      setCategoryOptions(types);
-      setSelectedCategories(types);
-    });
-  }, []);
+  const isSearch = search.trim().length > 0;
+  const visibleFilterOptions = isSearch
+    ? mergedFilterOptions.filter((f) => f.count > 0)
+    : mergedFilterOptions;
 
-  useEffect(() => {
-    if (search === "") {
-      const filtered = allProducts.filter((prod) =>
-        selectedCategories.includes(prod.type || "Sin tipo")
-      );
-      setProducts(filtered);
-    }
-  }, [search, selectedCategories, allProducts]);
-
-  // Buscar productos en backend
-  const doSearch = async (q = search, cats = selectedCategories) => {
+  // Solo buscar cuando lo pidas (no cada cambio en search)
+  const fetchData = async (s = search, cats = selectedCategories) => {
     setLoading(true);
-    const data = await searchProducts(q, cats);
-    setProducts(data.products);
+    const { products, filters } = await searchProducts(s, cats);
+    setProducts(products);
+    setFilterOptions(filters.types);
     setLoading(false);
   };
 
-  const handleSuggestion = (s: string) => {
-    setSearch(s);
-    doSearch(s, selectedCategories);
+  // Carga inicial de productos
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line
+  }, []);
+
+  // Al cambiar filtros lateral, sí actualiza inmediatamente:
+  const handleFilterChange = (cats: string[]) => {
+    setSelectedCategories(cats);
+    fetchData(search, cats);
   };
 
-  const handleProductRecommendation = (prod: Product) => {
-    setSearch(prod.name || "");
-    doSearch(prod.name || "", selectedCategories);
+  // Al dar Enter en el buscador:
+  const handleSearchEnter = () => {
+    fetchData(search, selectedCategories);
   };
+
+  // Al seleccionar sugerencia:
+  const handleSelectSuggestion = (s: string) => {
+    setSearch(s);
+    fetchData(s, selectedCategories);
+  };
+
+  // Al seleccionar producto recomendado:
+  const handleSelectProduct = (prod: Product) => {
+    setSearch(prod.name || "");
+    fetchData(prod.name || "", selectedCategories);
+  };
+
+  const handleClearSearch = () => {
+    setSearch("");
+    fetchData("", selectedCategories); // Vuelve a mostrar todo
+  };
+
+  // Calcula qué se está mostrando
+  let indicatorText: React.ReactNode = "";
+  if (search.trim() && selectedCategories.length) {
+    indicatorText = (
+      <>
+        <b>Buscando:</b> <i>"{search}"</i> &nbsp;
+        <span style={{ color: "#888" }}>|</span>&nbsp;
+        <b>Filtrando por:</b>{" "}
+        {selectedCategories.map((cat) => (
+          <span key={cat} style={{ marginRight: 8 }}>
+            {cat}
+          </span>
+        ))}
+      </>
+    );
+  } else if (search.trim()) {
+    indicatorText = (
+      <>
+        <b>Buscando:</b> <i>"{search}"</i>
+      </>
+    );
+  } else if (selectedCategories.length) {
+    indicatorText = (
+      <>
+        <b>Filtrando por:</b>{" "}
+        {selectedCategories.map((cat) => (
+          <span key={cat} style={{ marginRight: 8 }}>
+            {cat}
+          </span>
+        ))}
+      </>
+    );
+  } else {
+    indicatorText = "Mostrando todos los productos";
+  }
 
   if (loading) return <CustomLoader />;
 
   return (
     <Box>
-      {/* Buscador inteligente */}
       <ProductSearchHero
         products={products}
         search={search}
         setSearch={setSearch}
-        onSelectSuggestion={handleSuggestion}
-        onSelectProduct={handleProductRecommendation}
-        onEnter={() => doSearch()}
+        onSelectSuggestion={handleSelectSuggestion}
+        onSelectProduct={handleSelectProduct}
+        onEnter={handleSearchEnter}
         loading={loading}
+        onClear={handleClearSearch}
       />
-
       <Container size="xl" pt={rem(32)} pb={rem(40)}>
         <Flex
           direction={{ base: "column", md: "row" }}
@@ -264,102 +305,35 @@ export default function Home() {
           align="start"
           w="100%"
         >
-          {/* Filtro lateral solo desktop/tablet */}
           {!isMobile && (
             <CategorySidebarFilter
-              categoryOptions={categoryOptions}
-              products={products}
+              filterOptions={visibleFilterOptions}
               selectedCategories={selectedCategories}
-              onChange={(cats: string[]) => {
-                setSelectedCategories(cats);
-                doSearch(search, cats);
-              }}
+              onChange={handleFilterChange}
             />
           )}
-
+          {isMobile && (
+            <Group justify="start" mb="lg">
+              <CategoryMenuFilter
+                filterOptions={visibleFilterOptions}
+                selectedCategories={selectedCategories}
+                onChange={handleFilterChange}
+              />
+            </Group>
+          )}
           <Box flex={1} w="100%">
-            {/* Filtro menú solo móvil */}
-            {isMobile && (
-              <Group justify="start" mb="lg">
-                <CategoryMenuFilter
-                  categoryOptions={categoryOptions}
-                  products={products}
-                  selectedCategories={selectedCategories}
-                  onChange={(cats: string[]) => {
-                    setSelectedCategories(cats);
-                    doSearch(search, cats);
-                  }}
-                />
-              </Group>
-            )}
-
-            {/* Grilla de productos */}
             <Box mih={620}>
+
+              {/* Indicador de filtros/búsqueda */}
               <Text fw={700} size="xl" mb={2}>
-                Todos nuestros productos
+                {indicatorText}
               </Text>
               <Text c="dimmed" size="sm" mb="lg">
                 ({products.length} resultados)
               </Text>
               <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg">
                 {products.map((prod) => (
-                  <Card
-                    key={prod.code}
-                    withBorder
-                    radius="lg"
-                    style={{
-                      background: "#f6f6f6",
-                      minHeight: 230,
-                      position: "relative",
-                      cursor: "pointer",
-                      transition: "box-shadow 0.2s",
-                    }}
-                    onClick={() =>
-                      navigate(`/product/${encodeURIComponent(prod.code)}`)
-                    }
-                  >
-                    <Card.Section
-                      style={{ position: "relative", margin: "5px" }}
-                    >
-                      <Image
-                        src={prod.image || ""}
-                        alt={prod.name || "Producto"}
-                        height="auto"
-                        fit="contain"
-                        fallbackSrc="https://via.placeholder.com/180x120?text=Sin+Imagen"
-                        style={{ objectFit: "cover", borderRadius: "10px" }}
-                      />
-                    </Card.Section>
-                    <Stack align="center" gap={0} mt="md">
-                      <Text size="lg" fw={600}>
-                        {prod.name}
-                      </Text>
-                      <Text size="sm" c="dimmed">
-                        {prod.code}
-                      </Text>
-                    </Stack>
-                    <Button size="xs" bg="black" bdrs="lg" my="sm">
-                      Agregar al carrito (TBD)
-                    </Button>
-                    {prod.datasheet && (
-                      <Text
-                        component="a"
-                        href={prod.datasheet}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        size="sm"
-                        mt="xs"
-                        c="dark"
-                        style={{
-                          textAlign: "center",
-                          textDecoration: "underline",
-                          display: "block",
-                        }}
-                      >
-                        Ver ficha técnica ↗
-                      </Text>
-                    )}
-                  </Card>
+                  <ProductCard key={prod.code} product={prod} />
                 ))}
               </SimpleGrid>
             </Box>

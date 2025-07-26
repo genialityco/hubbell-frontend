@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable no-dupe-else-if */
 import { useState } from "react";
 import {
   TextInput,
@@ -15,7 +14,8 @@ import { createProduct } from "../services/productService";
 import * as XLSX from "xlsx";
 import type { Product } from "../types/Product";
 
-// Estado inicial ajustado: compatibles es array de objetos { code, type }
+const DEFAULT_IMAGE = "https://via.placeholder.com/180x120?text=Sin+Imagen";
+
 const INITIAL: Omit<Product, "_id"> = {
   code: "",
   name: "",
@@ -24,6 +24,7 @@ const INITIAL: Omit<Product, "_id"> = {
   group: "",
   line: "",
   image: "",
+  type: "",
   datasheet: "",
   compatibles: [],
   price: 0,
@@ -35,12 +36,12 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Maneja cambios simples
+  // Cambios individuales
   const handleChange = (key: keyof typeof form, value: unknown) => {
     setForm({ ...form, [key]: value });
   };
 
-  // Maneja compatibles desde el textarea (códigos separados por coma)
+  // Compatibles desde textarea
   const handleCompatibles = (value: string) => {
     setForm({
       ...form,
@@ -52,11 +53,14 @@ export default function AdminPanel() {
     });
   };
 
-  // Enviar producto individual
+  // Crear producto individual
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      await createProduct(form);
+      await createProduct({
+        ...form,
+        image: form.image || DEFAULT_IMAGE,
+      });
       setSuccess("Producto creado correctamente");
       setForm(INITIAL);
     } catch {
@@ -65,70 +69,138 @@ export default function AdminPanel() {
     setLoading(false);
   };
 
-  // CARGA MASIVA DESDE EXCEL
+  // CARGA MASIVA DESDE PLANTILLA
   const handleFileUpload = async (file: File | null) => {
     if (!file) return;
     setLoading(true);
 
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-    // Procesa productos principales y compatibles
-    let currentPrincipal: Omit<Product, "_id"> | null = null;
-    const productos: Omit<Product, "_id">[] = [];
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      // Un producto principal es aquel que tiene código y nombre
-      if (row.Codigo && row.ARTICULO) {
-        if (currentPrincipal) {
-          productos.push(currentPrincipal); // Guarda el anterior
+      // 1. Preparar todos los productos individuales (por código)
+      const productosMap: Record<string, Omit<Product, "_id">> = {};
+
+      rows.forEach((row) => {
+        const code = String(row["código"] || "").trim();
+        if (!code) return;
+
+        if (!productosMap[code]) {
+          productosMap[code] = {
+            code,
+            name: row["nombre"] || "",
+            type: row["tipo"] || "",
+            brand: row["marca"] || "",
+            provider: row["proveedor"] || "",
+            group: row["grupo"] || "",
+            line: row["línea"] || "",
+            image: row["imagen"] || DEFAULT_IMAGE,
+            datasheet: row["ficha_técnica"] || "",
+            compatibles: [],
+            price: Number(row["precio"] || 0),
+            stock: Number(row["stock"] || 0),
+          };
         }
-        // Nuevo producto principal
-        currentPrincipal = {
-          code: String(row.Codigo),
-          name: row.ARTICULO,
-          brand: row.Marca,
-          provider: row.Proveedor,
-          group: row.Grupo,
-          line: row.Linea,
-          image:
-            row["Imagen columna X"] ||
-            row["Imagen columna V"] ||
-            row["Imagen columna T"] ||
-            "",
-          datasheet:
-            row["Ficha Técnica columan Q"] ||
-            row["Ficha Técnica columan S"] ||
-            "",
-          compatibles: [],
-          price: Number(row.price || row.precio || 0), // Ajusta si tienes columnas de precio
-          stock: Number(row.stock || 0),
-        };
-      } else if (currentPrincipal && row.Codigo && row.ARTICULO) {
-        // Es compatible del producto principal actual
-        if (!currentPrincipal.compatibles) {
-          currentPrincipal.compatibles = [];
+      });
+
+      // 2. Asignar compatibles a cada producto principal
+      rows.forEach((row) => {
+        const code = String(row["código"] || "").trim();
+        const compCode = String(row["código_compatible"] || "").trim();
+        const compType = String(row["tipo_compatible"] || "").trim();
+
+        if (code && compCode && productosMap[code] && productosMap[code].compatibles) {
+          productosMap[code].compatibles.push({
+            code: compCode,
+            type: compType,
+          });
         }
-        currentPrincipal.compatibles.push({
-          code: String(row.Codigo),
-          type: row.TipoCompatible || "", // Puedes ajustar si tienes columna de tipo
+      });
+
+      // 3. Crear productos (todos)
+      for (const prod of Object.values(productosMap)) {
+        await createProduct({
+          ...prod,
+          image: prod.image || DEFAULT_IMAGE,
         });
       }
-    }
-    if (currentPrincipal) productos.push(currentPrincipal);
-
-    // Carga todos los productos
-    try {
-      for (const prod of productos) {
-        await createProduct(prod);
-      }
       setSuccess("Carga masiva completada");
-    } catch {
+    } catch (err) {
+      console.error("Error al cargar el archivo:", err);
       setSuccess("Error en la carga masiva");
     }
     setLoading(false);
+  };
+
+  // Descargar plantilla ejemplo
+  const downloadPlantilla = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      [
+        "código",
+        "nombre",
+        "tipo",
+        "marca",
+        "proveedor",
+        "grupo",
+        "línea",
+        "imagen",
+        "ficha_técnica",
+        "precio",
+        "stock",
+        "código_compatible",
+        "tipo_compatible",
+      ],
+      [
+        "CX-01",
+        "Cable X1",
+        "CABLE",
+        "Condumex",
+        "Acme",
+        "Cables",
+        "Alta",
+        "https://...",
+        "https://...",
+        1000,
+        5,
+        "YA25",
+        "Conector sup.",
+      ],
+      [
+        "CX-01",
+        "Cable X1",
+        "CABLE",
+        "Condumex",
+        "Acme",
+        "Cables",
+        "Alta",
+        "https://...",
+        "https://...",
+        1000,
+        5,
+        "YS25",
+        "Conector cable",
+      ],
+      [
+        "YA25",
+        "Conector YA25",
+        "CONECTOR",
+        "Hubbell",
+        "Acme",
+        "Conectores",
+        "Baja",
+        "https://...",
+        "https://...",
+        1200,
+        2,
+        "",
+        "",
+      ],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
+    XLSX.writeFile(wb, "plantilla_productos.xlsx");
   };
 
   return (
@@ -146,6 +218,11 @@ export default function AdminPanel() {
           value={form.name}
           onChange={(e) => handleChange("name", e.target.value)}
           required
+        />
+        <TextInput
+          label="Tipo"
+          value={form.type}
+          onChange={(e) => handleChange("type", e.target.value)}
         />
         <TextInput
           label="Marca"
@@ -201,8 +278,16 @@ export default function AdminPanel() {
 
       <Card withBorder mt="xl">
         <h2>Cargar productos masivamente</h2>
+        <Button
+          variant="outline"
+          mb="sm"
+          onClick={downloadPlantilla}
+          color="blue"
+        >
+          Descargar plantilla Excel
+        </Button>
         <FileInput
-          label="Archivo Excel o CSV"
+          label="Archivo Excel o CSV (usa plantilla)"
           placeholder="Sube un archivo .xlsx o .csv"
           accept=".xlsx, .xls, .csv"
           onChange={handleFileUpload}

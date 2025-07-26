@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import {
   Box,
   Button,
-  Card,
   Group,
   SimpleGrid,
   Text,
@@ -14,35 +13,32 @@ import {
   Flex,
   Paper,
 } from "@mantine/core";
-import { fetchProducts } from "../services/productService";
+import { fetchProductByCode } from "../services/productService";
 import type { Product } from "../types/Product";
 import CustomLoader from "../components/CustomLoader";
+import ProductCard from "../components/ProductCard";
 
 export default function ProductDetail() {
   const { code } = useParams();
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
   const [compatibles, setCompatibles] = useState<Product[]>([]);
+  const [compatibleWith, setCompatibleWith] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchProducts().then((data) => {
-      const realCode = code ? decodeURIComponent(code) : "";
-      const found = data.products.find((p: Product) => p.code === realCode);
-      setProduct(found || null);
+    if (!code) return;
+    // Llamada al backend que retorna { product, compatibles, compatibleWith }
+    type ProductDetailResponse = {
+      product: Product | null;
+      compatibles?: Product[];
+      compatibleWith?: Product[];
+    };
 
-      if (found?.compatibles && found.compatibles.length > 0) {
-        const compatiblesCodes = found.compatibles.map((c) => c.code);
-        const codesSet = new Set(
-          compatiblesCodes.map((c) => c.trim().toLowerCase())
-        );
-        const compatiblesList = data.products.filter((p: Product) =>
-          codesSet.has(p.code.trim().toLowerCase())
-        );
-        setCompatibles(compatiblesList);
-      } else {
-        setCompatibles([]);
-      }
+    fetchProductByCode(decodeURIComponent(code)).then((data: ProductDetailResponse) => {
+      setProduct(data.product);
+      setCompatibles(data.compatibles || []);
+      setCompatibleWith(data.compatibleWith || []);
       setLoading(false);
     });
   }, [code]);
@@ -66,7 +62,11 @@ export default function ProductDetail() {
     <Box maw={950} mx="auto" pt="xl" pb="lg" px="md">
       {/* Breadcrumb y botón volver */}
       <Group mb="md" gap="xs">
-        <Button variant="light" size="xs" onClick={() => navigate("/productos")}>
+        <Button
+          variant="light"
+          size="xs"
+          onClick={() => navigate("/productos")}
+        >
           ← Catálogo
         </Button>
         <Text c="dimmed" size="sm" mx={5}>
@@ -145,9 +145,13 @@ export default function ProductDetail() {
 
             <Group gap={24} mt={14} mb={2}>
               <Text size="xl" fw={600} color="dark">
-                {product.price ? `$${product.price.toLocaleString()}` : <span style={{color:"#ccc"}}>Sin precio</span>}
+                {product.price ? (
+                  `$${product.price.toLocaleString()}`
+                ) : (
+                  <span style={{ color: "#ccc" }}>Sin precio</span>
+                )}
               </Text>
-              <Text size="sm" c="dimmed">
+              {/* <Text size="sm" c="dimmed">
                 Stock:{" "}
                 <b>
                   {product.stock === undefined
@@ -156,28 +160,28 @@ export default function ProductDetail() {
                     ? "Sin stock"
                     : product.stock}
                 </b>
-              </Text>
+              </Text> */}
             </Group>
 
             <Group mt={16} gap={14}>
-              <Button size="lg" radius="xl" color="dark">
+              {/* <Button size="lg" radius="xl" color="dark">
                 Agregar al carrito
-              </Button>
+              </Button> */}
               {/* {product.datasheet && ( */}
-                <Button
-                  variant="outline"
-                  size="md"
-                  radius="xl"
-                  component="a"
-                  href={product.datasheet}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  color="gray"
-                  leftSection="↗"
-                  px={16}
-                >
-                  Ficha técnica
-                </Button>
+              <Button
+                variant="outline"
+                size="md"
+                radius="xl"
+                component="a"
+                href={product.datasheet}
+                target="_blank"
+                rel="noopener noreferrer"
+                color="gray"
+                leftSection="↗"
+                px={16}
+              >
+                Ficha técnica
+              </Button>
               {/* )} */}
             </Group>
           </Stack>
@@ -185,8 +189,6 @@ export default function ProductDetail() {
       </Paper>
 
       <Divider my="xl" label="Compatibles" labelPosition="center" />
-
-      {/* Compatibles */}
       <Text fw={700} size="lg" mb={8}>
         {compatibles.length === 0
           ? "Sin productos compatibles"
@@ -197,76 +199,36 @@ export default function ProductDetail() {
           Este producto no tiene productos compatibles registrados.
         </Text>
       ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg" mb="lg">
+        <SimpleGrid
+          cols={{ base: 1, sm: 2, md: 3, lg: 4 }}
+          spacing="lg"
+          mb="xl"
+        >
           {compatibles.map((comp) => (
-            <Card
-              key={comp.code}
-              withBorder
-              radius="xl"
-              shadow="md"
-              style={{
-                background: "#f8fafc",
-                minHeight: 230,
-                cursor: "pointer",
-                border: "2px solid #f1f3f6",
-                transition: "box-shadow 0.2s, border 0.2s",
-              }}
-              onClick={() =>
-                navigate(`/product/${encodeURIComponent(comp.code)}`)
-              }
-              onMouseOver={e => (e.currentTarget.style.border = '2px solid #777')}
-              onMouseOut={e => (e.currentTarget.style.border = '2px solid #f1f3f6')}
-            >
-              <Card.Section style={{ position: "relative", margin: "10px 10px 0 10px" }}>
-                <Image
-                  src={comp.image || ""}
-                  alt={comp.name || "Producto"}
-                  height={110}
-                  fit="contain"
-                  fallbackSrc="https://via.placeholder.com/180x110?text=Sin+Imagen"
-                  style={{ objectFit: "cover", borderRadius: 12, background: "#fff" }}
-                />
-              </Card.Section>
-              <Stack align="center" gap={0} mt="md">
-                <Text size="md" fw={600}>
-                  {comp.name}
-                </Text>
-                <Text size="sm" c="dimmed">
-                  {comp.code}
-                </Text>
-                <Text size="xs" c="dimmed">
-                  {comp.type || "Sin tipo"}
-                </Text>
-              </Stack>
-              <Button
-                size="xs"
-                radius="xl"
-                color="dark"
-                mt={12}
-                mb={6}
-                fullWidth
-              >
-                Agregar al carrito
-              </Button>
-              {comp.datasheet && (
-                <Text
-                  component="a"
-                  href={comp.datasheet}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  size="sm"
-                  mt="xs"
-                  c="blue"
-                  style={{
-                    textAlign: "center",
-                    textDecoration: "underline",
-                    display: "block",
-                  }}
-                >
-                  Ver ficha técnica ↗
-                </Text>
-              )}
-            </Card>
+            <ProductCard key={comp.code} product={comp} />
+          ))}
+        </SimpleGrid>
+      )}
+
+      {/* Es compatible con */}
+      <Divider my="xl" label="Es compatible con" labelPosition="center" />
+      <Text fw={700} size="lg" mb={8}>
+        {compatibleWith.length === 0
+          ? "No aparece como compatible en ningún producto"
+          : `Aparece como compatible en (${compatibleWith.length}) productos`}
+      </Text>
+      {compatibleWith.length === 0 ? (
+        <Text c="dimmed" mb="xl">
+          Este producto no aparece como compatible de ningún otro.
+        </Text>
+      ) : (
+        <SimpleGrid
+          cols={{ base: 1, sm: 2, md: 3, lg: 4 }}
+          spacing="lg"
+          mb="lg"
+        >
+          {compatibleWith.map((prod) => (
+            <ProductCard key={prod.code} product={prod} />
           ))}
         </SimpleGrid>
       )}
