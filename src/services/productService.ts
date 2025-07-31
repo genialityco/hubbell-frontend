@@ -37,6 +37,21 @@ export const fetchProductById = async (id: string): Promise<Product> => {
 
 // src/services/productService.ts
 export const fetchProductByCode = async (code: string) => {
-  const res = await axios.get(`${API_URL}/code?code=${encodeURIComponent(code)}`);
+  const res = await axios.get(
+    `${API_URL}/code?code=${encodeURIComponent(code)}`
+  );
+  return res.data;
+};
+
+export const updateProductCompatibles = async (
+  code: string,
+  compatibles: string[]
+) => {
+  const res = await axios.patch(
+    `${API_URL}/code/${encodeURIComponent(code)}/compatibles`,
+    {
+      compatibles,
+    }
+  );
   return res.data;
 };

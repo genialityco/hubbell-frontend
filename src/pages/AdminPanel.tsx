@@ -1,308 +1,261 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
-import {
-  TextInput,
-  NumberInput,
-  Button,
-  Card,
-  FileInput,
-  Stack,
-  Textarea,
-  Notification,
-} from "@mantine/core";
-import { createProduct } from "../services/productService";
-import * as XLSX from "xlsx";
-import type { Product } from "../types/Product";
+// /* eslint-disable @typescript-eslint/no-explicit-any */
+// import { useState } from "react";
+// import { Button, Card, FileInput, Stack, Notification } from "@mantine/core";
+// import {
+//   createProduct,
+//   fetchProductByCode,
+//   updateProductCompatibles,
+// } from "../services/productService";
+// import * as XLSX from "xlsx";
+// import type { Product } from "../types/Product";
 
-const DEFAULT_IMAGE = "https://via.placeholder.com/180x120?text=Sin+Imagen";
+// const DEFAULT_IMAGE = "https://via.placeholder.com/180x120?text=Sin+Imagen";
 
-const INITIAL: Omit<Product, "_id"> = {
-  code: "",
-  name: "",
-  brand: "",
-  provider: "",
-  group: "",
-  line: "",
-  image: "",
-  type: "",
-  datasheet: "",
-  compatibles: [],
-  price: 0,
-  stock: 0,
-};
+// export default function AdminPanel() {
+//   const [file, setFile] = useState<File | null>(null);
+//   const [loading, setLoading] = useState(false);
+//   const [success, setSuccess] = useState<string | null>(null);
 
-export default function AdminPanel() {
-  const [form, setForm] = useState<Omit<Product, "_id">>(INITIAL);
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
+//   // Define compatibles, imágenes y fichas según tus columnas exactas:
+//   const compatibleKeys = [
+//     "Conector a superficie plana",
+//     "Conector cable-cable",
+//     "Conector mecánico 1",
+//     "Conector mecánico 2",
+//     "Dado 1",
+//     "Dado 2",
+//     "Herramienta h. de baterias",
+//     "Herramienta hidráulica",
+//     "Herramienta mecánica",
+//     "Hta. de corte (cable)",
+//   ];
 
-  // Cambios individuales
-  const handleChange = (key: keyof typeof form, value: unknown) => {
-    setForm({ ...form, [key]: value });
-  };
+//   const imagenKeys = [
+//     "Conector a superficie\n||Imagen",
+//     "Conector cable-cable\n||Imagen ",
+//     "Conector mecánico 1\n||Imagen",
+//     "Conector mecánico 2\n||Imagen",
+//     "Dado 1\n||Imagen",
+//     "Dado 2\n||Imagen",
+//     "Herramienta h. de baterías\n||Imagen",
+//     "Herramienta hidáulica\n||Imagen",
+//     "Herramienta mecánica\n||Imagen",
+//     "Hta. de corte (cable)\n||Imagen",
+//   ];
 
-  // Compatibles desde textarea
-  const handleCompatibles = (value: string) => {
-    setForm({
-      ...form,
-      compatibles: value
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((code) => ({ code, type: "" })),
-    });
-  };
+//   const fichaKeys = [
+//     "Conector a superficie\n||Ficha Técnica",
+//     "Conector cable-cable\n||Ficha Técnica",
+//     "Conector mecánico 1\n||Ficha Técnica",
+//     "Conector mecánico 2\n||Ficha Técnica",
+//     "Dado 1\n||Ficha Técnica",
+//     "Dado 2\n||Ficha Técnica",
+//     "Herramienta h. de baterias\n||Ficha Técnica",
+//     "Herramienta hidáulica\n||Ficha Técnica",
+//     "Herramienta mecánica\n||Ficha Técnica",
+//     "Hta. de corte (cable)\n||Ficha Técnica",
+//   ];
 
-  // Crear producto individual
-  const handleSubmit = async () => {
-    setLoading(true);
-    try {
-      await createProduct({
-        ...form,
-        image: form.image || DEFAULT_IMAGE,
-      });
-      setSuccess("Producto creado correctamente");
-      setForm(INITIAL);
-    } catch {
-      setSuccess("Error al crear el producto");
-    }
-    setLoading(false);
-  };
+//   const handleFileUpload = async (selectedFile: File | null) => {
+//     if (!selectedFile) return;
+//     setLoading(true);
 
-  // CARGA MASIVA DESDE PLANTILLA
-  const handleFileUpload = async (file: File | null) => {
-    if (!file) return;
-    setLoading(true);
+//     try {
+//       const data = await selectedFile.arrayBuffer();
+//       const workbook = XLSX.read(data);
+//       const sheet = workbook.Sheets[workbook.SheetNames[0]];
+//       const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+//       // Para depuración
+//       console.log("Filas del Excel:", rows);
 
-      // 1. Preparar todos los productos individuales (por código)
-      const productosMap: Record<string, Omit<Product, "_id">> = {};
+//       // Map para evitar duplicados en la sesión de carga
+//       const productosMap: Record<string, Omit<Product, "_id">> = {};
 
-      rows.forEach((row) => {
-        const code = String(row["código"] || "").trim();
-        if (!code) return;
+//       for (const row of rows) {
+//         // --- PRODUCTO PRINCIPAL ---
+//         const codigo = row["Codigo"] || row["codigo"] || "";
+//         const articulo = row["Articulo"] || row["articulo"] || "";
+//         if (!codigo || !articulo) {
+//           console.warn("Fila sin código o sin nombre, se omite:", row);
+//           continue;
+//         }
 
-        if (!productosMap[code]) {
-          productosMap[code] = {
-            code,
-            name: row["nombre"] || "",
-            type: row["tipo"] || "",
-            brand: row["marca"] || "",
-            provider: row["proveedor"] || "",
-            group: row["grupo"] || "",
-            line: row["línea"] || "",
-            image: row["imagen"] || DEFAULT_IMAGE,
-            datasheet: row["ficha_técnica"] || "",
-            compatibles: [],
-            price: Number(row["precio"] || 0),
-            stock: Number(row["stock"] || 0),
-          };
-        }
-      });
+//         // Extrae el resto de campos
+//         const tipo = row["Tipo"] || row["tipo"] || "";
+//         const marca = row["Marca"] || row["marca"] || "";
+//         const linea = row["Linea"] || row["Línea"] || row["linea"] || row["línea"] || "";
+//         const grupo = row["Grupo"] || row["grupo"] || "";
+//         const imagen = row["Imagen Articulo"] || row["Imagen"] || row["imagen"] || DEFAULT_IMAGE;
+//         const ficha = row["Ficha tecnica Articulo"] || row["Ficha técnica"] || "";
 
-      // 2. Asignar compatibles a cada producto principal
-      rows.forEach((row) => {
-        const code = String(row["código"] || "").trim();
-        const compCode = String(row["código_compatible"] || "").trim();
-        const compType = String(row["tipo_compatible"] || "").trim();
+//         if (!productosMap[codigo]) {
+//           productosMap[codigo] = {
+//             code: codigo,
+//             name: articulo,
+//             type: tipo,
+//             brand: marca,
+//             line: linea,
+//             group: grupo,
+//             provider: "",
+//             image: imagen || DEFAULT_IMAGE,
+//             datasheet: ficha,
+//             compatibles: [],
+//             price: 0,
+//             stock: 0,
+//           };
+//           //console.log("Agregado producto principal:", productosMap[codigo]);
+//         }
 
-        if (code && compCode && productosMap[code] && productosMap[code].compatibles) {
-          productosMap[code].compatibles.push({
-            code: compCode,
-            type: compType,
-          });
-        }
-      });
+//         // --- COMPATIBLES ---
+//         for (let i = 0; i < compatibleKeys.length; i++) {
+//           const code = (row[compatibleKeys[i]] || "").toString().trim();
+//           if (!code) continue;
 
-      // 3. Crear productos (todos)
-      for (const prod of Object.values(productosMap)) {
-        await createProduct({
-          ...prod,
-          image: prod.image || DEFAULT_IMAGE,
-        });
-      }
-      setSuccess("Carga masiva completada");
-    } catch (err) {
-      console.error("Error al cargar el archivo:", err);
-      setSuccess("Error en la carga masiva");
-    }
-    setLoading(false);
-  };
+//           const imageComp = (row[imagenKeys[i]] || DEFAULT_IMAGE).toString();
+//           const fichaComp = (row[fichaKeys[i]] || "").toString();
 
-  // Descargar plantilla ejemplo
-  const downloadPlantilla = () => {
-    const ws = XLSX.utils.aoa_to_sheet([
-      [
-        "código",
-        "nombre",
-        "tipo",
-        "marca",
-        "proveedor",
-        "grupo",
-        "línea",
-        "imagen",
-        "ficha_técnica",
-        "precio",
-        "stock",
-        "código_compatible",
-        "tipo_compatible",
-      ],
-      [
-        "CX-01",
-        "Cable X1",
-        "CABLE",
-        "Condumex",
-        "Acme",
-        "Cables",
-        "Alta",
-        "https://...",
-        "https://...",
-        1000,
-        5,
-        "YA25",
-        "Conector sup.",
-      ],
-      [
-        "CX-01",
-        "Cable X1",
-        "CABLE",
-        "Condumex",
-        "Acme",
-        "Cables",
-        "Alta",
-        "https://...",
-        "https://...",
-        1000,
-        5,
-        "YS25",
-        "Conector cable",
-      ],
-      [
-        "YA25",
-        "Conector YA25",
-        "CONECTOR",
-        "Hubbell",
-        "Acme",
-        "Conectores",
-        "Baja",
-        "https://...",
-        "https://...",
-        1200,
-        2,
-        "",
-        "",
-      ],
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
-    XLSX.writeFile(wb, "plantilla_productos.xlsx");
-  };
+//           if (!productosMap[code]) {
+//             productosMap[code] = {
+//               code,
+//               name: code,
+//               type: "",
+//               brand: "",
+//               provider: "",
+//               group: "",
+//               line: "",
+//               image: imageComp || DEFAULT_IMAGE,
+//               datasheet: fichaComp,
+//               compatibles: [],
+//               price: 0,
+//               stock: 0,
+//             };
+//             //console.log("Agregado compatible:", productosMap[code]);
+//           }
 
-  return (
-    <Stack mx="auto" maw={500} mt="lg">
-      <Card withBorder>
-        <h2>Agregar producto individual</h2>
-        <TextInput
-          label="Código"
-          value={form.code}
-          onChange={(e) => handleChange("code", e.target.value)}
-          required
-        />
-        <TextInput
-          label="Nombre"
-          value={form.name}
-          onChange={(e) => handleChange("name", e.target.value)}
-          required
-        />
-        <TextInput
-          label="Tipo"
-          value={form.type}
-          onChange={(e) => handleChange("type", e.target.value)}
-        />
-        <TextInput
-          label="Marca"
-          value={form.brand}
-          onChange={(e) => handleChange("brand", e.target.value)}
-        />
-        <TextInput
-          label="Proveedor"
-          value={form.provider}
-          onChange={(e) => handleChange("provider", e.target.value)}
-        />
-        <TextInput
-          label="Grupo"
-          value={form.group}
-          onChange={(e) => handleChange("group", e.target.value)}
-        />
-        <TextInput
-          label="Línea"
-          value={form.line}
-          onChange={(e) => handleChange("line", e.target.value)}
-        />
-        <TextInput
-          label="URL Imagen"
-          value={form.image}
-          onChange={(e) => handleChange("image", e.target.value)}
-        />
-        <TextInput
-          label="URL Ficha Técnica"
-          value={form.datasheet}
-          onChange={(e) => handleChange("datasheet", e.target.value)}
-        />
-        <Textarea
-          label="Compatibles (códigos separados por coma)"
-          value={(form.compatibles ?? []).map((c) => c.code).join(", ")}
-          onChange={(e) => handleCompatibles(e.target.value)}
-        />
-        <NumberInput
-          label="Precio"
-          value={form.price}
-          min={0}
-          onChange={(val) => handleChange("price", Number(val))}
-        />
-        <NumberInput
-          label="Stock"
-          value={form.stock}
-          min={0}
-          onChange={(val) => handleChange("stock", Number(val))}
-        />
-        <Button mt="md" loading={loading} onClick={handleSubmit}>
-          Crear producto
-        </Button>
-      </Card>
+//           if (!productosMap[codigo].compatibles.some((c) => c.code === code)) {
+//             productosMap[codigo].compatibles.push({
+//               code,
+//               type: "",
+//             });
+//           }
+//         }
+//       }
 
-      <Card withBorder mt="xl">
-        <h2>Cargar productos masivamente</h2>
-        <Button
-          variant="outline"
-          mb="sm"
-          onClick={downloadPlantilla}
-          color="blue"
-        >
-          Descargar plantilla Excel
-        </Button>
-        <FileInput
-          label="Archivo Excel o CSV (usa plantilla)"
-          placeholder="Sube un archivo .xlsx o .csv"
-          accept=".xlsx, .xls, .csv"
-          onChange={handleFileUpload}
-        />
-      </Card>
+//       // Depura el mapa resultante:
+//       console.log("Mapa de productos a procesar:", productosMap);
 
-      {success && (
-        <Notification
-          color={success.includes("Error") ? "red" : "teal"}
-          mt="md"
-          onClose={() => setSuccess(null)}
-        >
-          {success}
-        </Notification>
-      )}
-    </Stack>
-  );
-}
+//       // --- CREAR/ACTUALIZAR PRODUCTOS EN EL BACKEND ---
+//       for (const [code, prod] of Object.entries(productosMap)) {
+//         let exists = false;
+//         try {
+//           await fetchProductByCode(code);
+//           exists = true;
+//         } catch (err) {
+//           exists = false;
+//         }
+//         if (!exists) {
+//           try {
+//             await createProduct({
+//               ...prod,
+//               image: prod.image || DEFAULT_IMAGE,
+//             });
+//           } catch (error) {
+//             console.error("Error al crear producto:", prod.code, error);
+//           }
+//         }
+//       }
+
+//       // --- ACTUALIZAR LOS COMPATIBLES SOLO DE LOS PRINCIPALES ---
+//       for (const [code, prod] of Object.entries(productosMap)) {
+//         if (prod.compatibles.length > 0) {
+//           try {
+//             await updateProductCompatibles(code, prod.compatibles);
+//           } catch (error) {
+//             console.error("Error actualizando compatibles para:", code, error);
+//           }
+//         }
+//       }
+
+//       setSuccess("Carga masiva completada");
+//       setFile(null);
+//     } catch (err) {
+//       console.error("Error general al cargar el archivo:", err);
+//       setSuccess("Error en la carga masiva");
+//     }
+//     setLoading(false);
+//   };
+
+//   // Descargar plantilla ejemplo
+//   const downloadPlantilla = () => {
+//     const ws = XLSX.utils.aoa_to_sheet([
+//       [
+//         "Codigo",
+//         "Articulo",
+//         "Tipo",
+//         "Marca",
+//         "Grupo",
+//         "Linea",
+//         "Imagen Articulo",
+//         "Ficha tecnica Articulo",
+//         // ... agrega tus compatibles y sus imágenes/fichas aquí ...
+//       ],
+//       [
+//         "CX-CTHW-1/0CM",
+//         "MTS CABLE THW CAL 1/0 NGO CM",
+//         "CONDUCTORES",
+//         "CONDUMEX",
+//         "CX CABLE VINANEL FORRADOS DE COBRE",
+//         "CXCTHW",
+//         "",
+//         "",
+//         // ... ejemplos para compatibles ...
+//       ],
+//     ]);
+//     const wb = XLSX.utils.book_new();
+//     XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
+//     XLSX.writeFile(wb, "plantilla_productos.xlsx");
+//   };
+
+//   return (
+//     <Stack mx="auto" maw={600} mt="lg">
+//       <Card withBorder>
+//         <h2>Cargar productos masivamente</h2>
+//         <Button
+//           variant="outline"
+//           mb="sm"
+//           onClick={downloadPlantilla}
+//           color="blue"
+//         >
+//           Descargar plantilla Excel
+//         </Button>
+//         <FileInput
+//           label="Archivo Excel o CSV (usa plantilla)"
+//           placeholder="Sube un archivo .xlsx o .csv"
+//           accept=".xlsx, .xls, .csv"
+//           value={file}
+//           onChange={setFile}
+//           loading={loading}
+//         />
+//         <Button
+//           mt="md"
+//           loading={loading}
+//           disabled={!file}
+//           onClick={() => handleFileUpload(file)}
+//         >
+//           Cargar productos
+//         </Button>
+//       </Card>
+
+//       {success && (
+//         <Notification
+//           color={success.includes("Error") ? "red" : "teal"}
+//           mt="md"
+//           onClose={() => setSuccess(null)}
+//         >
+//           {success}
+//         </Notification>
+//       )}
+//     </Stack>
+//   );
+// }

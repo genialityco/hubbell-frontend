@@ -35,12 +35,14 @@ export default function ProductDetail() {
       compatibleWith?: Product[];
     };
 
-    fetchProductByCode(decodeURIComponent(code)).then((data: ProductDetailResponse) => {
-      setProduct(data.product);
-      setCompatibles(data.compatibles || []);
-      setCompatibleWith(data.compatibleWith || []);
-      setLoading(false);
-    });
+    fetchProductByCode(decodeURIComponent(code)).then(
+      (data: ProductDetailResponse) => {
+        setProduct(data.product);
+        setCompatibles(data.compatibles || []);
+        setCompatibleWith(data.compatibleWith || []);
+        setLoading(false);
+      }
+    );
   }, [code]);
 
   if (loading) return <CustomLoader />;
@@ -132,11 +134,11 @@ export default function ProductDetail() {
             <Text c="dimmed" size="sm" mb={2}>
               Código: <b>{product.code}</b>
             </Text>
-            {product.provider && (
+            {/* {product.provider && (
               <Text size="sm" c="dimmed">
                 Proveedor: {product.provider}
               </Text>
-            )}
+            )} */}
             {product.group && (
               <Text size="sm" c="dimmed">
                 Grupo: {product.group}
@@ -144,13 +146,13 @@ export default function ProductDetail() {
             )}
 
             <Group gap={24} mt={14} mb={2}>
-              <Text size="xl" fw={600} color="dark">
+              {/* <Text size="xl" fw={600} color="dark">
                 {product.price ? (
                   `$${product.price.toLocaleString()}`
                 ) : (
                   <span style={{ color: "#ccc" }}>Sin precio</span>
                 )}
-              </Text>
+              </Text> */}
               {/* <Text size="sm" c="dimmed">
                 Stock:{" "}
                 <b>
@@ -188,50 +190,42 @@ export default function ProductDetail() {
         </Flex>
       </Paper>
 
-      <Divider my="xl" label="Compatibles" labelPosition="center" />
-      <Text fw={700} size="lg" mb={8}>
-        {compatibles.length === 0
-          ? "Sin productos compatibles"
-          : `Productos compatibles (${compatibles.length})`}
-      </Text>
-      {compatibles.length === 0 ? (
-        <Text c="dimmed" mb="xl">
-          Este producto no tiene productos compatibles registrados.
-        </Text>
-      ) : (
-        <SimpleGrid
-          cols={{ base: 1, sm: 2, md: 3, lg: 4 }}
-          spacing="lg"
-          mb="xl"
-        >
-          {compatibles.map((comp) => (
-            <ProductCard key={comp.code} product={comp} />
-          ))}
-        </SimpleGrid>
-      )}
+      <Divider my="xl" label="Productos compatibles" labelPosition="center" />
 
-      {/* Es compatible con */}
-      <Divider my="xl" label="Es compatible con" labelPosition="center" />
-      <Text fw={700} size="lg" mb={8}>
-        {compatibleWith.length === 0
-          ? "No aparece como compatible en ningún producto"
-          : `Aparece como compatible en (${compatibleWith.length}) productos`}
-      </Text>
-      {compatibleWith.length === 0 ? (
-        <Text c="dimmed" mb="xl">
-          Este producto no aparece como compatible de ningún otro.
-        </Text>
-      ) : (
-        <SimpleGrid
-          cols={{ base: 1, sm: 2, md: 3, lg: 4 }}
-          spacing="lg"
-          mb="lg"
-        >
-          {compatibleWith.map((prod) => (
-            <ProductCard key={prod.code} product={prod} />
-          ))}
-        </SimpleGrid>
-      )}
+      {(() => {
+        const relacionadosMap = new Map<string, Product>();
+        [...compatibles, ...compatibleWith].forEach((p) =>
+          relacionadosMap.set(p.code, p)
+        );
+        const relacionados = Array.from(relacionadosMap.values());
+
+        return relacionados.length === 0 ? (
+          <>
+            <Text fw={700} size="lg" mb={8}>
+              Sin productos compatibles
+            </Text>
+            <Text c="dimmed" mb="xl">
+              Este producto no tiene compatibles registradas con otros
+              productos.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text fw={700} size="lg" mb={8}>
+              Productos compatibles ({relacionados.length})
+            </Text>
+            <SimpleGrid
+              cols={{ base: 1, sm: 2, md: 3, lg: 4 }}
+              spacing="lg"
+              mb="lg"
+            >
+              {relacionados.map((prod) => (
+                <ProductCard key={prod.code} product={prod} />
+              ))}
+            </SimpleGrid>
+          </>
+        );
+      })()}
     </Box>
   );
 }

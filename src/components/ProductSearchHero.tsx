@@ -58,7 +58,6 @@ export default function ProductSearchHero({
   const [shouldShowPanel, setShouldShowPanel] = useState(false);
   const [, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
   const isMobile = useMediaQuery("(max-width: 48em)");
 
   function handleFocus() {
@@ -73,25 +72,28 @@ export default function ProductSearchHero({
     }, 120);
   }
 
+  // Sugerencias
   const suggestions = Array.from(
     new Set(
-      products
-        .flatMap((prod) => [
-          ...(prod.name ? [prod.name] : []),
-          ...(prod.group ? [prod.group] : []),
-        ])
-        .filter(Boolean)
+      products.flatMap((prod) => [prod.name, prod.group]).filter(Boolean)
     )
-  ).filter((s) =>
-    search.length > 0 ? s.toLowerCase().includes(search.toLowerCase()) : false
-  );
+  )
+    .filter((s) =>
+      search.length > 0
+        ? s!.toLowerCase().includes(search.toLowerCase())
+        : true // Mostrar todo cuando el input esté vacío
+    )
+    .slice(0, 8); // Limitar para que no sean muchas
 
-  const recommendations = products.filter(
-    (prod) =>
-      search.length > 0 &&
-      (prod.name?.toLowerCase().includes(search.toLowerCase()) ||
-        prod.code?.toLowerCase().includes(search.toLowerCase()))
-  );
+  // Recomendaciones
+  const recommendations = products
+    .filter((prod) =>
+      search.length > 0
+        ? prod.name?.toLowerCase().includes(search.toLowerCase()) ||
+          prod.code?.toLowerCase().includes(search.toLowerCase())
+        : true // Mostrar productos aleatorios cuando no hay texto
+    )
+    .slice(0, 4);
 
   // Panel: cerrar si click fuera
   const ref = useRef<HTMLDivElement>(null);
@@ -112,58 +114,29 @@ export default function ProductSearchHero({
       bg="#ededed"
       py={isMobile ? 16 : 20}
       px={isMobile ? 6 : 0}
-      // Ajusta el alto dependiendo si hay búsqueda
       style={{
-        minHeight:
-          search.length === 0
-            ? isMobile
-              ? 210
-              : 210
-            : isMobile
-            ? 90 // mucho más compacto en móvil
-            : 120, // más compacto en desktop
+        minHeight: search.length === 0 ? (isMobile ? 210 : 210) : isMobile ? 90 : 120,
         borderBottom: "1px solid #e4e4e4",
         textAlign: "center",
         position: "relative",
-        transition: "min-height 0.2s", // Suaviza la transición
+        transition: "min-height 0.2s",
       }}
     >
       {/* Textos solo si NO hay búsqueda */}
       {search.length === 0 && (
         <>
-          <Text
-            fw={700}
-            style={{
-              fontFamily: "inherit",
-              fontSize: isMobile ? "20px" : "24px",
-              lineHeight: 1.1,
-            }}
-          >
+          <Text fw={700} style={{ fontSize: isMobile ? "20px" : "24px", lineHeight: 1.1 }}>
             Búsqueda de producto
           </Text>
-          <Text
-            size={isMobile ? "md" : "lg"}
-            mt="md"
-            mb={isMobile ? 18 : 40}
-            c="dimmed"
-          >
+          <Text size={isMobile ? "md" : "lg"} mt="md" mb={isMobile ? 18 : 40} c="dimmed">
             Escribe el nombre o referencia del producto,
-            {isMobile ? <br /> : " "}o sube una imagen para ver productos
-            compatibles disponibles.
+            {isMobile ? <br /> : " "}o sube una imagen para ver productos compatibles disponibles.
           </Text>
         </>
       )}
 
       {/* Input */}
-      <Group
-        justify="center"
-        mx="auto"
-        maw={isMobile ? "100%" : 520}
-        w="100%"
-        style={{
-          padding: isMobile ? 0 : undefined,
-        }}
-      >
+      <Group justify="center" mx="auto" maw={isMobile ? "100%" : 520} w="100%">
         <Input
           ref={inputRef}
           leftSection={<IconSearch size={22} />}
@@ -173,17 +146,11 @@ export default function ProductSearchHero({
                 aria-label="Clear input"
                 onClick={() => {
                   setSearch("");
-                  setShouldShowPanel(false);
+                  setShouldShowPanel(true); // Mostrar sugerencias cuando se borra
                   onClear?.();
                 }}
                 style={{ display: search ? undefined : "none" }}
               />
-              {/* {!search && (
-                <IconCameraPlus
-                  size={22}
-                  style={{ cursor: "pointer", marginLeft: 4 }}
-                />
-              )} */}
             </>
           }
           rightSectionPointerEvents="all"
@@ -195,16 +162,12 @@ export default function ProductSearchHero({
           onChange={(e) => {
             setSearch(e.target.value);
             if (e.target.value === "") {
+              setShouldShowPanel(true);
               onClear?.();
             }
           }}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: isMobile ? 15 : 18,
-          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && onEnter) {
               onEnter();
@@ -212,30 +175,26 @@ export default function ProductSearchHero({
             }
           }}
           disabled={loading}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: isMobile ? 15 : 18,
+          }}
         />
       </Group>
 
-      {shouldShowPanel && search.length > 0 && (
+      {shouldShowPanel && (
         <Box
           ref={ref}
           pos="absolute"
           left="50%"
-          // Ajusta el top según si hay textos introductorios o no
-          top={
-            search.length === 0
-              ? isMobile
-                ? 190 // Espacio cuando están los textos arriba
-                : 190
-              : isMobile
-              ? 60 // Mucho más pegado cuando solo está el input
-              : 75 // También más pegado en desktop
-          }
+          top={search.length === 0 ? (isMobile ? 190 : 190) : isMobile ? 60 : 75}
           style={{
             transform: "translateX(-50%)",
             width: isMobile ? "92vw" : 730,
             zIndex: 20,
             maxWidth: isMobile ? "98vw" : 900,
-            transition: "top 0.18s", // Suave animación
+            transition: "top 0.18s",
           }}
         >
           <Paper
@@ -257,42 +216,45 @@ export default function ProductSearchHero({
                 <Text size={isMobile ? "sm" : "md"} fw={400} mb={10}>
                   Sugerencias de búsqueda
                 </Text>
-                {suggestions.length === 0 && (
+                {suggestions.length === 0 ? (
                   <Text c="dimmed" size="sm">
                     Sin sugerencias
                   </Text>
+                ) : (
+                  suggestions.map((sug) => (
+                    <Text
+                      fw={400}
+                      size={isMobile ? "md" : "lg"}
+                      my="xs"
+                      key={sug}
+                      component="span"
+                      style={{
+                        cursor: "pointer",
+                        borderRadius: 7,
+                        paddingLeft: 5,
+                        paddingRight: 5,
+                        transition: "background 0.15s",
+                        fontSize: isMobile ? 15 : 17,
+                      }}
+                      onMouseDown={() => {
+                        setSearch(sug!);
+                        onSelectSuggestion?.(sug!);
+                        setShouldShowPanel(false);
+                      }}
+                    >
+                      {highlightBold(sug!, search)}
+                    </Text>
+                  ))
                 )}
-                {suggestions.slice(0, 8).map((sug) => (
-                  <Text
-                    fw={400}
-                    size={isMobile ? "md" : "lg"}
-                    my="xs"
-                    key={sug}
-                    component="span"
-                    style={{
-                      cursor: "pointer",
-                      borderRadius: 7,
-                      paddingLeft: 5,
-                      paddingRight: 5,
-                      transition: "background 0.15s",
-                      fontSize: isMobile ? 15 : 17,
-                    }}
-                    onMouseDown={() => {
-                      setSearch(sug);
-                      onSelectSuggestion?.(sug);
-                      setShouldShowPanel(false);
-                    }}
-                  >
-                    {highlightBold(sug, search)}
-                  </Text>
-                ))}
               </Flex>
             </Stack>
+
             <Divider
               orientation={isMobile ? "horizontal" : "vertical"}
               mx={isMobile ? 0 : 8}
               my={isMobile ? 8 : 0}
             />
+
             {/* Recomendaciones de producto */}
             <Box style={{ flex: 1.1 }}>
               <Stack gap={isMobile ? 4 : 7}>
@@ -300,64 +262,65 @@ export default function ProductSearchHero({
                   <Text size={isMobile ? "sm" : "md"} fw={400} mb={10}>
                     Recomendaciones de productos
                   </Text>
-                  {recommendations.length === 0 && (
+                  {recommendations.length === 0 ? (
                     <Text c="dimmed" size="sm">
                       Sin resultados
                     </Text>
+                  ) : (
+                    recommendations.map((prod) => (
+                      <Paper
+                        key={prod.code}
+                        radius={10}
+                        shadow="xs"
+                        p={0}
+                        style={{
+                          background: "#fafafa",
+                          marginBottom: 12,
+                          cursor: "pointer",
+                          border: "1.5px solid #f2f2f2",
+                          width: "100%",
+                          minHeight: isMobile ? 60 : 84,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0,
+                        }}
+                        onMouseDown={() => {
+                          onSelectProduct?.(prod);
+                          setShouldShowPanel(false);
+                        }}
+                        onMouseOver={(e) =>
+                          (e.currentTarget.style.boxShadow = "0 0 0 2px #ffd43b")
+                        }
+                        onMouseOut={(e) =>
+                          (e.currentTarget.style.boxShadow = "0 1px 4px 0 #eee")
+                        }
+                      >
+                        <Image
+                          src={prod.image || ""}
+                          w={isMobile ? 60 : 80}
+                          h={isMobile ? 60 : 80}
+                          radius="md"
+                          fit="cover"
+                          alt={prod.name}
+                          fallbackSrc="https://via.placeholder.com/62x62?text=Img"
+                          m="xs"
+                        />
+                        <Flex direction="column" align="start">
+                          <Text
+                            fw={700}
+                            size={isMobile ? "sm" : "md"}
+                            lh={1.1}
+                            style={{ fontSize: isMobile ? 15 : 18 }}
+                          >
+                            {prod.name}
+                          </Text>
+                          <Text size="sm" c="dimmed">
+                            Código: {prod.code}
+                          </Text>
+                        </Flex>
+                      </Paper>
+                    ))
                   )}
-                  {recommendations.slice(0, 4).map((prod) => (
-                    <Paper
-                      key={prod.code}
-                      radius={10}
-                      shadow="xs"
-                      p={0}
-                      style={{
-                        background: "#fafafa",
-                        marginBottom: 12,
-                        cursor: "pointer",
-                        border: "1.5px solid #f2f2f2",
-                        width: "100%",
-                        minHeight: isMobile ? 60 : 84,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 0,
-                      }}
-                      onMouseDown={() => {
-                        onSelectProduct?.(prod);
-                        setShouldShowPanel(false);
-                      }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.boxShadow = "0 0 0 2px #ffd43b")
-                      }
-                      onMouseOut={(e) =>
-                        (e.currentTarget.style.boxShadow = "0 1px 4px 0 #eee")
-                      }
-                    >
-                      <Image
-                        src={prod.image || ""}
-                        w={isMobile ? 60 : 80}
-                        h={isMobile ? 60 : 80}
-                        radius="md"
-                        fit="cover"
-                        alt={prod.name}
-                        fallbackSrc="https://via.placeholder.com/62x62?text=Img"
-                        m="xs"
-                      />
-                      <Flex direction="column" align="start">
-                        <Text
-                          fw={700}
-                          size={isMobile ? "sm" : "md"}
-                          lh={1.1}
-                          style={{ fontSize: isMobile ? 15 : 18 }}
-                        >
-                          {prod.name}
-                        </Text>
-                        <Text size="sm" c="dimmed">
-                          Código: {prod.code}
-                        </Text>
-                      </Flex>
-                    </Paper>
-                  ))}
                 </Flex>
               </Stack>
             </Box>
