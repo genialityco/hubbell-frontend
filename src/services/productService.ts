@@ -2,8 +2,8 @@
 import axios from "axios";
 import type { Product } from "../types/Product";
 
-// const API_URL = "http://localhost:5000/api/products";
-const API_URL = "https://hubbell-backend-vmetx.ondigitalocean.app/api/products";
+const API_URL = "http://localhost:5000/api/products";
+// const API_URL = "https://hubbell-backend-vmetx.ondigitalocean.app/api/products";
 
 type ProductsResponse = {
   products: Product[];
@@ -17,11 +17,19 @@ export const createProduct = async (product: Omit<Product, "_id">) => {
   await axios.post(API_URL, product);
 };
 
-export const searchProducts = async (query: string, categories: string[]) => {
-  const res = await axios.post<ProductsResponse>(`${API_URL}/search`, {
-    query,
+export const searchProducts = async (
+  search: string,
+  categories: string[],
+  page: number,
+  limit: number
+) => {
+  const res = await axios.post(`${API_URL}/search`, {
+    query: search,
     categories,
+    page,
+    limit,
   });
+
   return res.data;
 };
 

@@ -3,6 +3,7 @@
 export interface ProductCompatible {
   type: string; // Tipo de compatible, ej: "Conector a superficie plana"
   code: string; // Código del producto compatible
+  datasheet?: string; // Ficha técnica del compatible
 }
 
 export interface Product {

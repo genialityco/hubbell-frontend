@@ -13,6 +13,7 @@ import {
   Divider,
   Button,
   Menu,
+  Pagination,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import type { Product } from "../types/Product";
@@ -62,11 +63,7 @@ function CategorySidebarFilter({
                 </Group>
               }
               checked={selectedCategories.includes(name)}
-              // 👇 NUNCA disables el checkbox
-              // disabled={false}
-              style={{
-                opacity: 1, // Opcional: si quieres grisar cuando count 0, pon: count === 0 ? 0.65 : 1
-              }}
+              style={{ opacity: 1 }}
               onChange={(e) => {
                 const checked = e.currentTarget.checked;
                 if (checked) {
@@ -189,10 +186,12 @@ export default function Home() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 20;
 
   const isMobile = useMediaQuery("(max-width: 48em)");
 
-  // Siempre mostrar los filtros seleccionados aunque estén en 0
   const mergedFilterOptions = [
     ...filterOptions,
     ...selectedCategories
@@ -205,39 +204,46 @@ export default function Home() {
     ? mergedFilterOptions.filter((f) => f.count > 0)
     : mergedFilterOptions;
 
-  // Solo buscar cuando lo pidas (no cada cambio en search)
-  const fetchData = async (s = search, cats = selectedCategories) => {
+  const fetchData = async (s = search, cats = selectedCategories, p = page) => {
     setLoading(true);
-    const { products, filters } = await searchProducts(s, cats);
+    const { products, filters, totalPages } = await searchProducts(
+      s,
+      cats,
+      p,
+      limit
+    );
     setProducts(products);
     setFilterOptions(filters.types);
+    setTotalPages(totalPages);
     setLoading(false);
   };
 
-  // Carga inicial de productos
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line
   }, []);
 
-  // Al cambiar filtros lateral, sí actualiza inmediatamente:
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchData(search, selectedCategories, newPage);
+  };
+
   const handleFilterChange = (cats: string[]) => {
     setSelectedCategories(cats);
-    fetchData(search, cats);
+    setPage(1);
+    fetchData(search, cats, 1);
   };
 
-  // Al dar Enter en el buscador:
   const handleSearchEnter = () => {
-    fetchData(search, selectedCategories);
+    setPage(1);
+    fetchData(search, selectedCategories, 1);
   };
 
-  // Al seleccionar sugerencia:
   const handleSelectSuggestion = (s: string) => {
     setSearch(s);
     fetchData(s, selectedCategories);
   };
 
-  // Al seleccionar producto recomendado:
   const handleSelectProduct = (prod: Product) => {
     setSearch(prod.name || "");
     fetchData(prod.name || "", selectedCategories);
@@ -245,10 +251,9 @@ export default function Home() {
 
   const handleClearSearch = () => {
     setSearch("");
-    fetchData("", selectedCategories); // Vuelve a mostrar todo
+    fetchData("", selectedCategories);
   };
 
-  // Calcula qué se está mostrando
   let indicatorText: React.ReactNode = "";
   if (search.trim() && selectedCategories.length) {
     indicatorText = (
@@ -323,8 +328,6 @@ export default function Home() {
           )}
           <Box flex={1} w="100%">
             <Box mih={620}>
-
-              {/* Indicador de filtros/búsqueda */}
               <Text fw={700} size="xl" mb={2}>
                 {indicatorText}
               </Text>
@@ -337,6 +340,16 @@ export default function Home() {
                 ))}
               </SimpleGrid>
             </Box>
+
+            {totalPages > 1 && (
+              <Group justify="center" mt="lg">
+                <Pagination
+                  value={page}
+                  onChange={handlePageChange}
+                  total={totalPages}
+                />
+              </Group>
+            )}
           </Box>
         </Flex>
       </Container>

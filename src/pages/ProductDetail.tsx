@@ -121,11 +121,11 @@ export default function ProductDetail() {
                   {product.brand}
                 </Badge>
               )}
-              {product.stock === 0 && (
+              {/* {product.stock === 0 && (
                 <Badge color="red" size="sm" variant="filled">
                   Sin stock
                 </Badge>
-              )}
+              )} */}
             </Group>
 
             <Text fw={700} size="2xl" lh={1.2}>
