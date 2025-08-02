@@ -188,6 +188,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const limit = 20;
 
   const isMobile = useMediaQuery("(max-width: 48em)");
@@ -206,7 +207,7 @@ export default function Home() {
 
   const fetchData = async (s = search, cats = selectedCategories, p = page) => {
     setLoading(true);
-    const { products, filters, totalPages } = await searchProducts(
+    const { products, filters, totalPages, total } = await searchProducts(
       s,
       cats,
       p,
@@ -215,6 +216,7 @@ export default function Home() {
     setProducts(products);
     setFilterOptions(filters.types);
     setTotalPages(totalPages);
+    setTotal(total);
     setLoading(false);
   };
 
@@ -332,8 +334,9 @@ export default function Home() {
                 {indicatorText}
               </Text>
               <Text c="dimmed" size="sm" mb="lg">
-                ({products.length} resultados)
+                ({total} resultados)
               </Text>
+
               <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg">
                 {products.map((prod) => (
                   <ProductCard key={prod.code} product={prod} />

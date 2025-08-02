@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Container, Group, rem } from "@mantine/core";
-import logo from "../assets/logo.png";
+import { Container, Flex, Group, rem } from "@mantine/core";
 import headerDesktop from "../assets/header-desktop.png";
 import headerMobile from "../assets/header-mobile.png";
 // import { IconHeart, IconShoppingCart } from "@tabler/icons-react";
@@ -27,7 +26,14 @@ export default function Header() {
     >
       <Container size="xl" h={80} py={0} px={rem(0)} fluid>
         <Group justify="space-between" align="center" h="100%" px="lg">
-          <img src={logo} alt="Logo Hubbell" width={110} />
+          <Flex gap="md" align="center">
+            <img
+              src="/Logo-Hubbell-blanco.svg"
+              alt="Logo Hubbell"
+              width={110}
+            />
+            <img src="/Logo-Burndy-Blanco.svg" alt="Logo Burndy" width={110} />
+          </Flex>
           {/* <Group gap="xs">
             <IconHeart size={26} style={{ cursor: "pointer" }} />
             <IconShoppingCart size={26} style={{ cursor: "pointer" }} />
