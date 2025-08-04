@@ -28,7 +28,6 @@ export default function ProductCard({ product }: ProductCardProps) {
         <Image
           src={product.image || ""}
           alt={product.name || "Producto"}
-
           fit="contain"
           fallbackSrc="https://via.placeholder.com/180x120?text=Sin+Imagen"
           style={{
@@ -40,6 +39,9 @@ export default function ProductCard({ product }: ProductCardProps) {
       </Card.Section>
 
       <Stack align="center" gap={0} mt="md">
+        <Text size="sm" c="dimmed">
+          {product.type}
+        </Text>
         <Text size="lg" fw={600}>
           {product.name}
         </Text>
