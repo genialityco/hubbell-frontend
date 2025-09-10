@@ -14,12 +14,13 @@ import {
   Button,
   Menu,
   Pagination,
+  Select,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import type { Product } from "../types/Product";
 import { searchProducts } from "../services/productService";
 import ProductSearchHero from "../components/ProductSearchHero";
-import CustomLoader from "../components/CustomLoader";
+import CustomLoader from "../components/CustomLoader"; // 👈 loader inicial
 import { IconFilter } from "@tabler/icons-react";
 import ProductCard from "../components/ProductCard";
 
@@ -66,11 +67,8 @@ function CategorySidebarFilter({
               style={{ opacity: 1 }}
               onChange={(e) => {
                 const checked = e.currentTarget.checked;
-                if (checked) {
-                  onChange([...selectedCategories, name]);
-                } else {
-                  onChange(selectedCategories.filter((c) => c !== name));
-                }
+                if (checked) onChange([...selectedCategories, name]);
+                else onChange(selectedCategories.filter((c) => c !== name));
               }}
               mb={2}
               size="sm"
@@ -144,11 +142,8 @@ function CategoryMenuFilter({
               }}
               onChange={(e) => {
                 const checked = e.currentTarget.checked;
-                if (checked) {
-                  onChange([...selectedCategories, name]);
-                } else {
-                  onChange(selectedCategories.filter((c) => c !== name));
-                }
+                if (checked) onChange([...selectedCategories, name]);
+                else onChange(selectedCategories.filter((c) => c !== name));
               }}
               mb={2}
               size="sm"
@@ -185,11 +180,17 @@ export default function Home() {
   const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const limit = 20;
+  const [limit, setLimit] = useState<number>(20);
+
+  const [matchedProduct, setMatchedProduct] = useState<Product | null>(null);
+  const [compatibleProducts, setCompatibleProducts] = useState<Product[]>([]);
+
+  // 👇 loaders separados
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const isMobile = useMediaQuery("(max-width: 48em)");
 
@@ -205,62 +206,120 @@ export default function Home() {
     ? mergedFilterOptions.filter((f) => f.count > 0)
     : mergedFilterOptions;
 
-  const fetchData = async (s = search, cats = selectedCategories, p = page) => {
-    setLoading(true);
-    const { products, filters, totalPages, total } = await searchProducts(
-      s,
-      cats,
-      p,
-      limit
-    );
-    setProducts(products);
-    setFilterOptions(filters.types);
-    setTotalPages(totalPages);
-    setTotal(total);
-    setLoading(false);
+  const [reqId, setReqId] = useState(0);
+
+  const fetchData = async (
+    s = search,
+    cats = selectedCategories,
+    p = page,
+    l = limit,
+    opts?: { initial?: boolean }
+  ) => {
+    const currentId = reqId + 1;
+    setReqId(currentId);
+
+    // decide qué loader mostrar
+    if (opts?.initial) setInitialLoading(true);
+    else setSearchLoading(true);
+
+    try {
+      const {
+        products,
+        filters,
+        totalPages,
+        total,
+        matchedProduct,
+        compatibleProducts,
+      } = await searchProducts(s, cats, p, l);
+
+      // evita race conditions
+      if (currentId !== reqId + 1) return;
+
+      setProducts(products);
+      setFilterOptions(filters.types);
+      setTotalPages(totalPages);
+      setTotal(total);
+      setMatchedProduct(matchedProduct ?? null);
+      setCompatibleProducts(compatibleProducts ?? []);
+    } catch (err) {
+      console.error("Error buscando productos:", err);
+    } finally {
+      if (opts?.initial) setInitialLoading(false);
+      else setSearchLoading(false);
+    }
   };
 
+  // carga inicial
   useEffect(() => {
-    fetchData();
+    fetchData(search, selectedCategories, page, limit, { initial: true });
     // eslint-disable-next-line
   }, []);
 
+  // búsqueda en vivo con debounce (usa loader de búsqueda)
+  useEffect(() => {
+    const q = search.trim();
+
+    if (q.length === 0) {
+      setPage(1);
+      const id = setTimeout(
+        () => fetchData("", selectedCategories, 1, limit),
+        150
+      );
+      return () => clearTimeout(id);
+    }
+
+    const t = setTimeout(() => {
+      setPage(1);
+      fetchData(q, selectedCategories, 1, limit);
+    }, 300);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, selectedCategories, limit]);
+
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    fetchData(search, selectedCategories, newPage);
+    fetchData(search, selectedCategories, newPage, limit);
   };
 
   const handleFilterChange = (cats: string[]) => {
     setSelectedCategories(cats);
     setPage(1);
-    fetchData(search, cats, 1);
+    fetchData(search, cats, 1, limit);
   };
 
   const handleSearchEnter = () => {
     setPage(1);
-    fetchData(search, selectedCategories, 1);
+    fetchData(search, selectedCategories, 1, limit);
   };
 
   const handleSelectSuggestion = (s: string) => {
     setSearch(s);
-    fetchData(s, selectedCategories);
+    fetchData(s, selectedCategories, 1, limit);
   };
 
   const handleSelectProduct = (prod: Product) => {
     setSearch(prod.name || "");
-    fetchData(prod.name || "", selectedCategories);
+    fetchData(prod.name || "", selectedCategories, 1, limit);
   };
 
   const handleClearSearch = () => {
     setSearch("");
-    fetchData("", selectedCategories);
+    fetchData("", selectedCategories, 1, limit);
+  };
+
+  const handleChangeLimit = (value: string | null) => {
+    const newLimit = parseInt(value || "20", 10);
+    setLimit(newLimit);
+    setPage(1);
+    fetchData(search, selectedCategories, 1, newLimit);
   };
 
   let indicatorText: React.ReactNode = "";
   if (search.trim() && selectedCategories.length) {
     indicatorText = (
       <>
-        <b>Buscando:</b> <i>"{search}"</i> &nbsp;
+        <b>Buscando:</b> <i>"{search}"</i>&nbsp;
         <span style={{ color: "#888" }}>|</span>&nbsp;
         <b>Filtrando por:</b>{" "}
         {selectedCategories.map((cat) => (
@@ -291,7 +350,11 @@ export default function Home() {
     indicatorText = "Mostrando todos los productos";
   }
 
-  if (loading) return <CustomLoader />;
+  // 👇 Solo loader inicial desmonta el resto
+  if (initialLoading) return <CustomLoader />;
+
+  const startIdx = total === 0 ? 0 : (page - 1) * limit + 1;
+  const endIdx = Math.min(page * limit, total);
 
   return (
     <Box>
@@ -302,9 +365,12 @@ export default function Home() {
         onSelectSuggestion={handleSelectSuggestion}
         onSelectProduct={handleSelectProduct}
         onEnter={handleSearchEnter}
-        loading={loading}
+        loading={searchLoading} // 👈 solo loader de búsqueda
         onClear={handleClearSearch}
+        matchedProduct={matchedProduct}
+        compatibleProducts={compatibleProducts}
       />
+
       <Container size="xl" pt={rem(32)} pb={rem(40)}>
         <Flex
           direction={{ base: "column", md: "row" }}
@@ -319,6 +385,7 @@ export default function Home() {
               onChange={handleFilterChange}
             />
           )}
+
           {isMobile && (
             <Group justify="start" mb="lg">
               <CategoryMenuFilter
@@ -328,31 +395,49 @@ export default function Home() {
               />
             </Group>
           )}
+
           <Box flex={1} w="100%">
             <Box mih={620}>
-              <Text fw={700} size="xl" mb={2}>
-                {indicatorText}
-              </Text>
-              <Text c="dimmed" size="sm" mb="lg">
-                ({total} resultados)
-              </Text>
+              <Group justify="space-between" align="center" mb="sm" wrap="wrap">
+                <Text fw={700} size="xl">
+                  {indicatorText}
+                </Text>
+                <Group gap="xs">
+                  <Text c="dimmed" size="sm">
+                    Mostrando {startIdx}-{endIdx} de {total}
+                  </Text>
+                  <Select
+                    w={160}
+                    size="xs"
+                    value={String(limit)}
+                    data={[
+                      { value: "10", label: "10 por página" },
+                      { value: "20", label: "20 por página" },
+                      { value: "40", label: "40 por página" },
+                      { value: "60", label: "60 por página" },
+                    ]}
+                    onChange={handleChangeLimit}
+                    allowDeselect={false}
+                  />
+                </Group>
+              </Group>
 
               <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="lg">
                 {products.map((prod) => (
                   <ProductCard key={prod.code} product={prod} />
                 ))}
               </SimpleGrid>
-            </Box>
 
-            {totalPages > 1 && (
-              <Group justify="center" mt="lg">
-                <Pagination
-                  value={page}
-                  onChange={handlePageChange}
-                  total={totalPages}
-                />
-              </Group>
-            )}
+              {totalPages > 1 && (
+                <Group justify="flex-end" mt="lg">
+                  <Pagination
+                    value={page}
+                    onChange={handlePageChange}
+                    total={totalPages}
+                  />
+                </Group>
+              )}
+            </Box>
           </Box>
         </Flex>
       </Container>

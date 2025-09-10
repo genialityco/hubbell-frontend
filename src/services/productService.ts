@@ -2,7 +2,13 @@
 import axios from "axios";
 import type { Product } from "../types/Product";
 
-const API_URL = import.meta.env.VITE_API_URL??"https://hubbell-backend-vmetx.ondigitalocean.app/api/products";
+// const API_URL =
+//   import.meta.env.VITE_API_URL ??
+//   "https://hubbell-backend-vmetx.ondigitalocean.app/api/products";
+
+const API_URL =
+  import.meta.env.VITE_API_URL ??
+  "http://localhost:5000/api/products";
 
 type ProductsResponse = {
   products: Product[];
@@ -10,6 +16,16 @@ type ProductsResponse = {
     types: { name: string; count: number }[];
   };
   total: number;
+};
+
+export type SearchResponse = {
+  products: Product[];
+  filters: { types: { name: string; count: number }[] };
+  total: number;
+  totalPages: number;
+  currentPage: number;
+  matchedProduct?: Product | null;
+  compatibleProducts?: Product[];
 };
 
 export const createProduct = async (product: Omit<Product, "_id">) => {
@@ -21,14 +37,13 @@ export const searchProducts = async (
   categories: string[],
   page: number,
   limit: number
-) => {
+): Promise<SearchResponse> => {
   const res = await axios.post(`${API_URL}/search`, {
     query: search,
     categories,
     page,
     limit,
   });
-
   return res.data;
 };
 

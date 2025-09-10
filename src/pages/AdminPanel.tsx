@@ -17,6 +17,56 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // --- Helpers ---
+
+  // Normaliza cadenas: minúsculas, sin acentos, espacios colapsados
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  // Encuentra la columna hermana tolerando diferencias leves en el nombre base
+  function findSiblingColumn(
+    columns: string[],
+    base: string,
+    kind: "Imagen" | "Ficha Tecnica"
+  ): string | null {
+    const exact = `${base}||${kind}`;
+    if (columns.includes(exact)) return exact;
+
+    // Recorta palabras desde el final: "Conector a superficie plana" -> "Conector a superficie"
+    const tokens = base.split(/\s+/);
+    for (let cut = tokens.length - 1; cut >= 1; cut--) {
+      const partial = tokens.slice(0, cut).join(" ");
+      const candidate = `${partial}||${kind}`;
+      if (columns.includes(candidate)) return candidate;
+    }
+
+    // Búsqueda por prefijo normalizado
+    const nBase = norm(base);
+    const candidates = columns.filter((c) => c.endsWith("||" + kind));
+    for (const c of candidates) {
+      const left = c.split("||")[0];
+      const nLeft = norm(left);
+      if (nLeft.startsWith(nBase) || nBase.startsWith(nLeft)) {
+        return c;
+      }
+    }
+    return null;
+  }
+
+  // Limpia keys por fila (trim de encabezados)
+  function trimRowKeys(row: Record<string, any>) {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(row)) {
+      out[k.trim()] = v;
+    }
+    return out;
+  }
+
   const handleFileUpload = async (selectedFile: File | null) => {
     if (!selectedFile) return;
     setLoading(true);
@@ -25,11 +75,19 @@ export default function AdminPanel() {
       const data = await selectedFile.arrayBuffer();
       const workbook = XLSX.read(data);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      const rowsRaw: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-      if (rows.length === 0) throw new Error("El archivo está vacío");
+      if (rowsRaw.length === 0) throw new Error("El archivo está vacío");
 
-      const columnas = Object.keys(rows[0]);
+      // Normaliza headers por fila
+      const rows = rowsRaw.map(trimRowKeys);
+
+      // Recolecta TODAS las columnas (trim) porque algunos encabezados pueden variar por fila
+      const columnasSet = new Set<string>();
+      for (const r of rows) {
+        Object.keys(r).forEach((k) => columnasSet.add(k));
+      }
+      const columnas = Array.from(columnasSet);
 
       const camposPrincipales = new Set([
         "Codigo",
@@ -42,6 +100,7 @@ export default function AdminPanel() {
         "Ficha tecnica Articulo",
       ]);
 
+      // Todas las columnas que son "bases" de compatibles (no principales ni hermanas directas)
       const compatibleKeys = columnas.filter(
         (key) =>
           !camposPrincipales.has(key) &&
@@ -52,16 +111,16 @@ export default function AdminPanel() {
       const productosMap: Record<string, Omit<Product, "_id">> = {};
 
       for (const row of rows) {
-        const codigo = row["Codigo"] || "";
-        const articulo = row["Articulo"] || "";
+        const codigo = (row["Codigo"] || "").toString().trim();
+        const articulo = (row["Articulo"] || "").toString().trim();
         if (!codigo || !articulo) continue;
 
-        const tipo = row["Tipo"] || "";
-        const marca = row["Marca"] || "";
-        const linea = row["Linea"] || "";
-        const grupo = row["Grupo"] || "";
-        const imagen = row["Imagen Articulo"] || DEFAULT_IMAGE;
-        const ficha = row["Ficha tecnica Articulo"] || "";
+        const tipo = (row["Tipo"] || "").toString().trim();
+        const marca = (row["Marca"] || "").toString().trim();
+        const linea = (row["Linea"] || "").toString().trim();
+        const grupo = (row["Grupo"] || "").toString().trim();
+        const imagen = (row["Imagen Articulo"] || DEFAULT_IMAGE).toString().trim();
+        const ficha = (row["Ficha tecnica Articulo"] || "").toString().trim();
 
         if (!productosMap[codigo]) {
           productosMap[codigo] = {
@@ -84,10 +143,19 @@ export default function AdminPanel() {
           const compCode = (row[key] || "").toString().trim();
           if (!compCode) continue;
 
-          const imageComp = (row[`${key}||Imagen`] || DEFAULT_IMAGE).toString();
-          const fichaComp = (row[`${key}||Ficha Tecnica`] || "").toString();
-          const typeComp = key;
+          // Busca las columnas hermanas aun si el Excel no coincide 1:1
+          const imageCol = findSiblingColumn(columnas, key, "Imagen");
+          const fichaCol = findSiblingColumn(columnas, key, "Ficha Tecnica");
 
+          const imageComp = ((imageCol ? row[imageCol] : "") || DEFAULT_IMAGE)
+            .toString()
+            .trim();
+          const fichaComp = ((fichaCol ? row[fichaCol] : "") || "")
+            .toString()
+            .trim();
+          const typeComp = key; // usamos el nombre de la columna base como "tipo" del compatible
+
+          // Crea (si no existe) el producto compatible con sus metadatos
           if (!productosMap[compCode]) {
             productosMap[compCode] = {
               code: compCode,
@@ -103,21 +171,28 @@ export default function AdminPanel() {
               price: 0,
               stock: 0,
             };
+          } else {
+            // Si ya existe pero no tiene imagen/datasheet, complétalos
+            if (!productosMap[compCode].image)
+              productosMap[compCode].image = imageComp || DEFAULT_IMAGE;
+            if (!productosMap[compCode].datasheet && fichaComp)
+              productosMap[compCode].datasheet = fichaComp;
           }
 
-          if (
-            !productosMap[codigo].compatibles?.some((c) => c.code === compCode)
-          ) {
-            productosMap[codigo].compatibles?.push({
+          // Vincula el compatible al producto principal (evita duplicados)
+          const list = productosMap[codigo].compatibles || [];
+          if (!list.some((c: any) => c.code === compCode)) {
+            list.push({
               code: compCode,
               type: typeComp,
               datasheet: fichaComp,
             });
+            productosMap[codigo].compatibles = list as any;
           }
         }
       }
 
-      // Crear productos en el backend
+      // 1) Crear productos que no existan
       for (const [code, prod] of Object.entries(productosMap)) {
         let exists = false;
         try {
@@ -138,14 +213,12 @@ export default function AdminPanel() {
         }
       }
 
-      // Actualizar compatibles de productos principales
+      // 2) Actualizar compatibles de productos principales
       for (const [code, prod] of Object.entries(productosMap)) {
         if (Array.isArray(prod.compatibles) && prod.compatibles.length > 0) {
           try {
-            await updateProductCompatibles(
-              code,
-              prod.compatibles as unknown as string[]
-            );
+            // Enviar el arreglo de objetos tal cual (NO castear a string[])
+            await updateProductCompatibles(code, prod.compatibles as any);
           } catch (error) {
             console.error("Error actualizando compatibles para:", code, error);
           }
@@ -200,12 +273,7 @@ export default function AdminPanel() {
     <Stack mx="auto" maw={600} mt="lg">
       <Card withBorder>
         <h2>Cargar productos masivamente</h2>
-        <Button
-          variant="outline"
-          mb="sm"
-          onClick={downloadPlantilla}
-          color="blue"
-        >
+        <Button variant="outline" mb="sm" onClick={downloadPlantilla} color="blue">
           Descargar plantilla Excel
         </Button>
         <FileInput
@@ -215,12 +283,7 @@ export default function AdminPanel() {
           value={file}
           onChange={setFile}
         />
-        <Button
-          mt="md"
-          loading={loading}
-          disabled={!file}
-          onClick={() => handleFileUpload(file)}
-        >
+        <Button mt="md" loading={loading} disabled={!file} onClick={() => handleFileUpload(file)}>
           Cargar productos
         </Button>
       </Card>

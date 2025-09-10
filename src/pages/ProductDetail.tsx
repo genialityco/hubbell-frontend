@@ -170,20 +170,22 @@ export default function ProductDetail() {
                 Agregar al carrito
               </Button> */}
               {/* {product.datasheet && ( */}
-              <Button
-                variant="outline"
-                size="md"
-                radius="xl"
-                component="a"
-                href={product.datasheet}
-                target="_blank"
-                rel="noopener noreferrer"
-                color="gray"
-                leftSection="↗"
-                px={16}
-              >
-                Ficha técnica
-              </Button>
+              {product.datasheet && (
+                <Button
+                  variant="outline"
+                  size="md"
+                  radius="xl"
+                  component="a"
+                  href={product.datasheet}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="gray"
+                  leftSection="↗"
+                  px={16}
+                >
+                  Ficha técnica
+                </Button>
+              )}
               {/* )} */}
             </Group>
           </Stack>

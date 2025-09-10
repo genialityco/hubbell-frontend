@@ -9,6 +9,7 @@ import {
   Divider,
   Flex,
   CloseButton,
+  Loader,
 } from "@mantine/core";
 import { IconSearch } from "@tabler/icons-react";
 import { useRef, useState, useEffect } from "react";
@@ -19,7 +20,7 @@ import type { Product } from "../types/Product";
 function highlightBold(text: string, query: string) {
   if (!query) return text;
   const regex = new RegExp(
-    `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+    `(${query.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")})`,
     "gi"
   );
   const parts = text.split(regex);
@@ -41,8 +42,10 @@ interface ProductSearchHeroProps {
   onSelectSuggestion?: (s: string) => void;
   onSelectProduct?: (product: Product) => void;
   onEnter?: () => void;
-  loading?: boolean;
+  loading?: boolean; // 👈 loader de búsqueda
   onClear?: () => void;
+  matchedProduct?: Product | null;
+  compatibleProducts?: Product[];
 }
 
 export default function ProductSearchHero({
@@ -54,6 +57,8 @@ export default function ProductSearchHero({
   onEnter,
   loading = false,
   onClear,
+  matchedProduct,
+  compatibleProducts = [],
 }: ProductSearchHeroProps) {
   const [shouldShowPanel, setShouldShowPanel] = useState(false);
   const [, setFocused] = useState(false);
@@ -69,21 +74,23 @@ export default function ProductSearchHero({
     setTimeout(() => {
       setShouldShowPanel(false);
       setFocused(false);
-    }, 120);
+    }, 160);
   }
 
   // Sugerencias
   const suggestions = Array.from(
-    new Set(
-      products.flatMap((prod) => [prod.name, prod.group]).filter(Boolean)
-    )
+    new Set(products.flatMap((prod) => [prod.name, prod.group]).filter(Boolean))
   )
     .filter((s) =>
-      search.length > 0
-        ? s!.toLowerCase().includes(search.toLowerCase())
-        : true // Mostrar todo cuando el input esté vacío
+      search.length > 0 ? s!.toLowerCase().includes(search.toLowerCase()) : true
     )
-    .slice(0, 8); // Limitar para que no sean muchas
+    .slice(0, 8);
+
+  const showCompatibles =
+    !!matchedProduct &&
+    compatibleProducts &&
+    compatibleProducts.length > 0 &&
+    matchedProduct.code.toLowerCase() === search.trim().toLowerCase();
 
   // Recomendaciones
   const recommendations = products
@@ -91,7 +98,7 @@ export default function ProductSearchHero({
       search.length > 0
         ? prod.name?.toLowerCase().includes(search.toLowerCase()) ||
           prod.code?.toLowerCase().includes(search.toLowerCase())
-        : true // Mostrar productos aleatorios cuando no hay texto
+        : true
     )
     .slice(0, 4);
 
@@ -115,7 +122,8 @@ export default function ProductSearchHero({
       py={isMobile ? 16 : 20}
       px={isMobile ? 6 : 0}
       style={{
-        minHeight: search.length === 0 ? (isMobile ? 210 : 210) : isMobile ? 90 : 120,
+        minHeight:
+          search.length === 0 ? (isMobile ? 210 : 210) : isMobile ? 90 : 120,
         borderBottom: "1px solid #e4e4e4",
         textAlign: "center",
         position: "relative",
@@ -125,12 +133,21 @@ export default function ProductSearchHero({
       {/* Textos solo si NO hay búsqueda */}
       {search.length === 0 && (
         <>
-          <Text fw={700} style={{ fontSize: isMobile ? "20px" : "24px", lineHeight: 1.1 }}>
+          <Text
+            fw={700}
+            style={{ fontSize: isMobile ? "20px" : "24px", lineHeight: 1.1 }}
+          >
             Búsqueda de producto
           </Text>
-          <Text size={isMobile ? "md" : "lg"} mt="md" mb={isMobile ? 18 : 40} c="dimmed">
+          <Text
+            size={isMobile ? "md" : "lg"}
+            mt="md"
+            mb={isMobile ? 18 : 40}
+            c="dimmed"
+          >
             Escribe el nombre o referencia del producto,
-            {isMobile ? <br /> : " "}o sube una imagen para ver productos compatibles disponibles.
+            {isMobile ? <br /> : " "}o sube una imagen para ver productos
+            compatibles disponibles.
           </Text>
         </>
       )}
@@ -141,17 +158,18 @@ export default function ProductSearchHero({
           ref={inputRef}
           leftSection={<IconSearch size={22} />}
           rightSection={
-            <>
+            <Group gap={6}>
+              {loading && <Loader size="sm" />}
               <CloseButton
                 aria-label="Clear input"
                 onClick={() => {
                   setSearch("");
-                  setShouldShowPanel(true); // Mostrar sugerencias cuando se borra
+                  setShouldShowPanel(true);
                   onClear?.();
                 }}
                 style={{ display: search ? undefined : "none" }}
               />
-            </>
+            </Group>
           }
           rightSectionPointerEvents="all"
           radius="md"
@@ -160,26 +178,21 @@ export default function ProductSearchHero({
           bg="#eaf6fb"
           value={search}
           onChange={(e) => {
-            setSearch(e.target.value);
-            if (e.target.value === "") {
-              setShouldShowPanel(true);
-              onClear?.();
-            }
+            const val = e.target.value;
+            setSearch(val);
+            setShouldShowPanel(true); // mantener panel visible mientras escribe
+            if (val === "") onClear?.();
           }}
           onFocus={handleFocus}
           onBlur={handleBlur}
           onKeyDown={(e) => {
             if (e.key === "Enter" && onEnter) {
               onEnter();
-              setShouldShowPanel(false);
+              setShouldShowPanel(true); // no ocultar el panel al Enter
             }
           }}
-          disabled={loading}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: isMobile ? 15 : 18,
-          }}
+          // No deshabilitar el input durante búsqueda: permite seguir escribiendo
+          style={{ flex: 1, minWidth: 0, fontSize: isMobile ? 15 : 18 }}
         />
       </Group>
 
@@ -188,7 +201,9 @@ export default function ProductSearchHero({
           ref={ref}
           pos="absolute"
           left="50%"
-          top={search.length === 0 ? (isMobile ? 190 : 190) : isMobile ? 60 : 75}
+          top={
+            search.length === 0 ? (isMobile ? 190 : 190) : isMobile ? 60 : 75
+          }
           style={{
             transform: "translateX(-50%)",
             width: isMobile ? "92vw" : 730,
@@ -210,6 +225,64 @@ export default function ProductSearchHero({
               fontSize: isMobile ? 15 : 16,
             }}
           >
+            {/* Compatibles */}
+            {showCompatibles && (
+              <Box style={{ width: "100%" }}>
+                <Text size={isMobile ? "sm" : "md"} fw={600} mb={10}>
+                  Compatibles con {matchedProduct!.code}
+                </Text>
+                <Stack gap={8} mb={isMobile ? 12 : 16}>
+                  {compatibleProducts.slice(0, 6).map((prod) => (
+                    <Paper
+                      key={`compat-${prod.code}`}
+                      radius={10}
+                      shadow="xs"
+                      p={0}
+                      style={{
+                        background: "#fffef7",
+                        marginBottom: 8,
+                        cursor: "pointer",
+                        border: "1.5px solid #ffe08a",
+                        width: "100%",
+                        minHeight: isMobile ? 56 : 72,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0,
+                      }}
+                      onMouseDown={() => {
+                        onSelectProduct?.(prod);
+                        setShouldShowPanel(false);
+                      }}
+                    >
+                      <Image
+                        src={prod.image || ""}
+                        w={isMobile ? 56 : 72}
+                        h={isMobile ? 56 : 72}
+                        radius="md"
+                        fit="cover"
+                        alt={prod.name}
+                        fallbackSrc="https://via.placeholder.com/62x62?text=Img"
+                        m="xs"
+                      />
+                      <Flex
+                        direction="column"
+                        align="start"
+                        style={{ paddingRight: 8 }}
+                      >
+                        <Text fw={700} size={isMobile ? "sm" : "md"} lh={1.1}>
+                          {prod.name}
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          Código: {prod.code}
+                        </Text>
+                      </Flex>
+                    </Paper>
+                  ))}
+                </Stack>
+                <Divider my={isMobile ? 8 : 12} />
+              </Box>
+            )}
+
             {/* Sugerencias */}
             <Stack gap={isMobile ? 2 : 3} mb={isMobile ? 20 : 0}>
               <Flex align="start" direction="column">
@@ -255,7 +328,7 @@ export default function ProductSearchHero({
               my={isMobile ? 8 : 0}
             />
 
-            {/* Recomendaciones de producto */}
+            {/* Recomendaciones */}
             <Box style={{ flex: 1.1 }}>
               <Stack gap={isMobile ? 4 : 7}>
                 <Flex align="start" direction="column">
@@ -289,7 +362,8 @@ export default function ProductSearchHero({
                           setShouldShowPanel(false);
                         }}
                         onMouseOver={(e) =>
-                          (e.currentTarget.style.boxShadow = "0 0 0 2px #ffd43b")
+                          (e.currentTarget.style.boxShadow =
+                            "0 0 0 2px #ffd43b")
                         }
                         onMouseOut={(e) =>
                           (e.currentTarget.style.boxShadow = "0 1px 4px 0 #eee")
