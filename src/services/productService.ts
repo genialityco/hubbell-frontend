@@ -4,7 +4,7 @@ import type { Product } from "../types/Product";
 
 const API_URL =
   import.meta.env.VITE_API_URL ??
-  "https://hubbell-backend-vmetx.ondigitalocean.app/api/products";
+  "https://hubbell-backend.vercel.app/api/products";
 
 // const API_URL =
 //   import.meta.env.VITE_API_URL ??
